@@ -5,7 +5,21 @@ import numpy as np
 
 plt.ion()
 
-im = misc.imread('/home/evgeniy/Documents/Py/Quadrotor/Image_9.jpg')
+def is3PointsOn1Line(p1, p2, p3):
+    #calulate a and b from p1 and p2
+    a = (p2[1] - p1[1]) / (p2[0] - p1[0])
+    b = p1[1] - a * p1[0]
+    y3calc = a * p3[0] + b
+    if abs(y3calc - p3[1]) / p3[1] < 0.1:
+       print 'yes'
+    else:
+       print 'now'
+
+def isPointOnGrid(PointNum, ClusterCoord):
+    print PointNum
+
+
+im = misc.imread('Image_9.jpg')
 W = im.shape[0]
 L = im.shape[1]
 NumOfPoints = np.count_nonzero(im == 255)
@@ -40,14 +54,17 @@ Clusters = np.array(Clusters)
 PointCoord = np.array(PointCoord)
 
 plt.imshow(im)
-X = np.zeros(Clusters.shape[0])
+ClusterCoord = np.zeros([Clusters.shape[0], 2])
 Y = np.zeros(Clusters.shape[0])
 
 #Find clusters' centres
 for i in xrange(Clusters.shape[0]):
-  X[i] = PointCoord[Clusters[i]][:,0].mean().round()
-  Y[i] = PointCoord[Clusters[i]][:,1].mean().round()
+  ClusterCoord[i] = [PointCoord[Clusters[i]][:,0].mean().round(), PointCoord[Clusters[i]][:,1].mean().round()]
+
 plt.imshow(im)
-plt.plot(Y,X,'o')
 
+plt.plot(ClusterCoord[:,1],ClusterCoord[:,0],'o')
 
+#Test these points to be on grid
+#isPointOnGrid(3, ClusterCoord)
+is3PointsOn1Line(ClusterCoord[6,:],ClusterCoord[7,:],ClusterCoord[8,:])
