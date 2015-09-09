@@ -10,23 +10,36 @@ def isPointOnGrid(p1, p2, p3):
     p1 = p1.astype(float)
     p2 = p2.astype(float)
     p3 = p3.astype(float)
-    Tol = 0.1#tolerance band
+    Tol = 0.15#tolerance band
+
     #are these points on the same line?
-    #calulate a and b from p1 and p2
-    a = (p2[1] - p1[1]) / (p2[0] - p1[0])
-    b = p1[1] - a * p1[0]
-    y3calc = a * p3[0] + b
+    #calulate a and b
+
+    #some exceptions: if two points have the same X coord
+    #in order to avoid division by zero try another pair:
+    #if all 3 points have the same X then it's a straight line
+    if (p1[0] == p2[0]) and (p1[0] == p3[0]):
+        CondL = 1#straight line
+    elif p1[0] == p2[0]:
+        a = (p3[1] - p1[1]) / (p3[0] - p1[0])
+        b = p1[1] - a * p1[0]
+        ycalc = a * p2[0] + b
+        CondL = abs(ycalc - p2[1]) / p2[1] < Tol
+    else:
+        a = (p2[1] - p1[1]) / (p2[0] - p1[0])
+        b = p1[1] - a * p1[0]
+        ycalc = a * p3[0] + b
+        CondL = abs(ycalc - p3[1]) / p3[1] < Tol
+    
     #are these points equally spaced?
     #calculate distance between them
     d12 = math.sqrt(pow(p1[0] - p2[0], 2) + pow(p1[1] - p2[1], 2))
     d13 = math.sqrt(pow(p1[0] - p3[0], 2) + pow(p1[1] - p3[1], 2))
     d23 = math.sqrt(pow(p2[0] - p3[0], 2) + pow(p2[1] - p3[1], 2))
-    #Confitions
-    CondL = abs(y3calc - p3[1]) / p3[1] < Tol
-    CondD1 = (abs(d12 - d23) / d12 < Tol) and (abs(d13 - 2 * d23) / d13 < Tol)
-    CondD2 = (abs(d12 - d13) / d12 < Tol) and (abs(d23 - 2 * d13) / d23 < Tol)
+    #Distance test
+    CondD = (abs(d12 - d23) / ((d12 + d23) / 2) < Tol) and (abs(d13 - 2 * d23) / ((d13 + 2 * d23) / 2) < Tol)
 
-    if CondL and (CondD1 or CondD2):
+    if CondL and CondD:
        return 1
     else:
        return 0
@@ -78,21 +91,19 @@ for i in xrange(Clusters.shape[0]):
 ClusterCoord = ClusterCoord.astype(int)
 plt.imshow(im)
 
-
+Triples = []
 
 #Test these points to be on grid
 
 for p1 in xrange(ClusterCoord.shape[0]):
     for p2 in xrange(ClusterCoord.shape[0]):
         for p3 in xrange(ClusterCoord.shape[0]):
-            if p1 == p2 or p1 == p3 or p2 == p3:
+            Cond1 = ((p1 == p2) or (p1 == p3) or (p2 == p3))
+            Cond2 = sorted([p1, p2, p3]) in Triples
+            if Cond1 or Cond2:
                 continue
             else:
                 if isPointOnGrid(ClusterCoord[p1,:],ClusterCoord[p2,:],ClusterCoord[p3,:]):
+                    Triples.append(sorted([p1, p2, p3]))
                     print p1, p2, p3
-                    plt.plot(ClusterCoord[p1,1],ClusterCoord[p1,0],'o')
-		    plt.plot(ClusterCoord[p2,1],ClusterCoord[p2,0],'o')
-		    plt.plot(ClusterCoord[p3,1],ClusterCoord[p3,0],'o')
-		    
 
-#1,3,4,6,7,8,9,10,11
