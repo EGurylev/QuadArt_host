@@ -6,7 +6,16 @@ import math
 
 plt.ion()
 
-def isPointOnGrid(p1, p2, p3):
+#############################################################
+def dist(p1, p2):
+    return math.sqrt(pow(p1[0] - p2[0], 2) + pow(p1[1] - p2[1], 2))
+#############################################################
+
+
+#############################################################
+def isTriple(p1, p2, p3, A):
+    #test given three points to be triple. Triple is an object
+    #which has three equally spaced points lying on the one line
     p1 = p1.astype(float)
     p2 = p2.astype(float)
     p3 = p3.astype(float)
@@ -33,16 +42,34 @@ def isPointOnGrid(p1, p2, p3):
     
     #are these points equally spaced?
     #calculate distance between them
-    d12 = math.sqrt(pow(p1[0] - p2[0], 2) + pow(p1[1] - p2[1], 2))
-    d13 = math.sqrt(pow(p1[0] - p3[0], 2) + pow(p1[1] - p3[1], 2))
-    d23 = math.sqrt(pow(p2[0] - p3[0], 2) + pow(p2[1] - p3[1], 2))
+    d12 = dist(p1, p2)
+    d13 = dist(p1, p3)
+    d23 = dist(p2, p3)
     #Distance test
     CondD = (abs(d12 - d23) / ((d12 + d23) / 2) < Tol) and (abs(d13 - 2 * d23) / ((d13 + 2 * d23) / 2) < Tol)
 
     if CondL and CondD:
+       A.append(a)
        return 1
     else:
        return 0
+#############################################################
+
+#############################################################
+def isGrid(t1, t2, t3, AList):
+    #test given three triples to be a grid. Triples must be
+    #parallel to each other and equally spaced
+    
+    #are the triples parallel to each other?
+    Tol = 0.15#tolerance band
+    dA12 = abs(AList[0] - AList[1]) / ((abs(AList[0]) + abs(AList[1])) / 2) < Tol
+    dA13 = abs(AList[0] - AList[2]) / ((abs(AList[0]) + abs(AList[2])) / 2) < Tol
+    dA23 = abs(AList[1] - AList[2]) / ((abs(AList[1]) + abs(AList[2])) / 2) < Tol
+    if dA12 and dA13 and dA23:
+        return 1
+    else:
+        return 0
+#############################################################
 
 
 im = misc.imread('Image_9.jpg')
@@ -92,9 +119,10 @@ ClusterCoord = ClusterCoord.astype(int)
 plt.imshow(im)
 
 Triples = []
+Grids = []
+A = []#list of line coefficients for triples (Ax + b)
 
-#Test these points to be on grid
-
+#Test 3 points to be the triple
 for p1 in xrange(ClusterCoord.shape[0]):
     for p2 in xrange(ClusterCoord.shape[0]):
         for p3 in xrange(ClusterCoord.shape[0]):
@@ -103,7 +131,27 @@ for p1 in xrange(ClusterCoord.shape[0]):
             if Cond1 or Cond2:
                 continue
             else:
-                if isPointOnGrid(ClusterCoord[p1,:],ClusterCoord[p2,:],ClusterCoord[p3,:]):
+                if isTriple(ClusterCoord[p1,:],ClusterCoord[p2,:],ClusterCoord[p3,:], A):
                     Triples.append(sorted([p1, p2, p3]))
-                    print p1, p2, p3
+                    print p1, p2, p3, A[-1]
+
+print
+
+#Test 3 triples to be the grid:
+for t1 in xrange(len(Triples)):
+    for t2 in xrange(len(Triples)):
+        for t3 in xrange(len(Triples)):
+            Cond1 = ((t1 == t2) or (t1 == t3) or (t2 == t3))
+            Cond2 = ((Triples[t1][0] == Triples[t2][0]) or (Triples[t1][0] == Triples[t3][0]) or (Triples[t2][0] == Triples[t3][0]))
+            Cond3 = sorted([Triples[t1], Triples[t2], Triples[t3]]) in Grids
+            if Cond1 or Cond2 or Cond3:
+                continue
+            else:
+                AList = [A[t1], A[t2], A[t3]]
+                if isGrid(t1, t2, t3, AList):
+                    Grids.append(sorted([Triples[t1], Triples[t2], Triples[t3]]))
+		    print Triples[t1]
+                    print Triples[t2]
+                    print Triples[t3]
+                    print "..."
 
