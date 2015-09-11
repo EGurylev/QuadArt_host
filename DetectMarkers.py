@@ -19,7 +19,7 @@ def isTriple(p1, p2, p3, A):
     p1 = p1.astype(float)
     p2 = p2.astype(float)
     p3 = p3.astype(float)
-    Tol = 0.15#tolerance band
+    Tol = 0.2#tolerance band
 
     #are these points on the same line?
     #calulate a and b
@@ -29,6 +29,7 @@ def isTriple(p1, p2, p3, A):
     #if all 3 points have the same X then it's a straight line
     if (p1[0] == p2[0]) and (p1[0] == p3[0]):
         CondL = 1#straight line
+        a = 0
     elif p1[0] == p2[0]:
         a = (p3[1] - p1[1]) / (p3[0] - p1[0])
         b = p1[1] - a * p1[0]
@@ -61,18 +62,18 @@ def isGrid(t1, t2, t3, AList):
     #parallel to each other and equally spaced
     
     #are the triples parallel to each other?
-    Tol = 0.15#tolerance band
-    dA12 = abs(AList[0] - AList[1]) / ((abs(AList[0]) + abs(AList[1])) / 2) < Tol
-    dA13 = abs(AList[0] - AList[2]) / ((abs(AList[0]) + abs(AList[2])) / 2) < Tol
-    dA23 = abs(AList[1] - AList[2]) / ((abs(AList[1]) + abs(AList[2])) / 2) < Tol
-    if dA12 and dA13 and dA23:
+    Tol = 0.2#tolerance band
+    dA12 = abs(AList[0] - AList[1]) / ((abs(AList[0]) + abs(AList[1])) / 2)
+    dA13 = abs(AList[0] - AList[2]) / ((abs(AList[0]) + abs(AList[2])) / 2)
+    dA23 = abs(AList[1] - AList[2]) / ((abs(AList[1]) + abs(AList[2])) / 2)
+    if (dA12 + dA13 + dA23) / 3 < Tol:
         return 1
     else:
         return 0
 #############################################################
 
 
-im = misc.imread('Image_9.jpg')
+im = misc.imread('Image1.jpg')
 W = im.shape[0]
 L = im.shape[1]
 NumOfPoints = np.count_nonzero(im == 255)
@@ -137,21 +138,34 @@ for p1 in xrange(ClusterCoord.shape[0]):
 
 print
 
-#Test 3 triples to be the grid:
+#Test 3 triples to be parallel to each other:
 for t1 in xrange(len(Triples)):
     for t2 in xrange(len(Triples)):
         for t3 in xrange(len(Triples)):
             Cond1 = ((t1 == t2) or (t1 == t3) or (t2 == t3))
             Cond2 = ((Triples[t1][0] == Triples[t2][0]) or (Triples[t1][0] == Triples[t3][0]) or (Triples[t2][0] == Triples[t3][0]))
-            Cond3 = sorted([Triples[t1], Triples[t2], Triples[t3]]) in Grids
-            if Cond1 or Cond2 or Cond3:
+            Cond3 = ((Triples[t1][1] == Triples[t2][1]) or (Triples[t1][1] == Triples[t3][1]) or (Triples[t2][1] == Triples[t3][1]))
+            Cond4 = ((Triples[t1][2] == Triples[t2][2]) or (Triples[t1][2] == Triples[t3][2]) or (Triples[t2][2] == Triples[t3][2]))
+            Cond5 = sorted([Triples[t1], Triples[t2], Triples[t3]]) in Grids
+            if Cond1 or Cond2 or Cond3 or Cond4 or Cond5:
                 continue
             else:
                 AList = [A[t1], A[t2], A[t3]]
                 if isGrid(t1, t2, t3, AList):
                     Grids.append(sorted([Triples[t1], Triples[t2], Triples[t3]]))
-		    print Triples[t1]
-                    print Triples[t2]
-                    print Triples[t3]
-                    print "..."
+		    #print Triples[t1]
+                    #print Triples[t2]
+                    #print Triples[t3]
+                    #print "..."
 
+#Test triples to form the grid:
+Grids = np.array(Grids)
+for g1 in xrange(Grids.shape[0]):
+    for g2 in xrange(Grids.shape[0]):
+        if np.all(np.transpose(Grids[g1]) == Grids[g2]):
+            i = g1
+            break
+print "Grid is found!"
+print Grids[i]
+GridPts = np.reshape(Grids[i], 9)
+plt.plot(ClusterCoord[GridPts][:,1], ClusterCoord[GridPts][:,0],'o')
