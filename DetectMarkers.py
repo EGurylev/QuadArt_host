@@ -14,93 +14,71 @@ def dist(p1, p2):
 
 
 #############################################################
-def isTriple(p1, p2, p3, A):
-    #test given three points to be triple. Triple is an object
-    #which has three equally spaced points lying on the one line
+def defineLine(p1, p2, A, D):
+    #construct line for each pair of points: calculate angle
+    #and length:
     p1 = p1.astype(float)
     p2 = p2.astype(float)
-    p3 = p3.astype(float)
-    Tol = 0.15#tolerance band
 
-    #are these points on the same line?
-    #calulate a and b
+    #calulate angle of line:
+    a = math.atan((p2[1] - p1[1]) / (p2[0] - p1[0]))
+   
+    #calculate length of this line
+    d = dist(p1, p2)
 
-    #some exceptions: if two points have the same X coord
-    #in order to avoid division by zero try another pair:
-    #if all 3 points have the same X then it's a straight line
-    if (p1[0] == p2[0]) and (p1[0] == p3[0]):
-        CondL = 1#straight line
-        a = 0
-    elif p1[0] == p2[0]:
-        a = (p3[1] - p1[1]) / (p3[0] - p1[0])
-        b = p1[1] - a * p1[0]
-        ycalc = a * p2[0] + b
-        CondL = abs(ycalc - p2[1]) / p2[1] < Tol
-    else:
-        a = (p2[1] - p1[1]) / (p2[0] - p1[0])
-        b = p1[1] - a * p1[0]
-        ycalc = a * p3[0] + b
-        CondL = abs(ycalc - p3[1]) / p3[1] < Tol
-    
-    #are these points equally spaced?
-    #calculate distance between them
-    d12 = dist(p1, p2)
-    d13 = dist(p1, p3)
-    d23 = dist(p2, p3)
-    #Distance test
-    CondD = (abs(d12 - d23) / ((d12 + d23) / 2) < Tol) and (abs(d13 - 2 * d23) / ((d13 + 2 * d23) / 2) < Tol)
-
-    if CondL and CondD:
-       A.append(a)
-       return 1
-    else:
-       return 0
+    A.append(a)
+    D.append(d)
+    return 0
 #############################################################
 
 #############################################################
-def isGrid(t1, t2, t3, AList, DistanceList):
-    #test given three triples to be a grid. Triples must be
-    #parallel to each other and equally spaced
+def isSide(AList, LengthList, AreaList):
+    #test given tuple of lines to be a parallel sides of 
+    #parallelogram. Lines must be parallel to each other,
+    #equally spaced and have equal areas of their "points" 
+    #(blob clusters).
+
+    Tol = 0.1#tolerance band
     
     #are the triples parallel to each other?
-    Tol = 0.15#tolerance band
-    dA12 = abs(AList[0] - AList[1]) / ((abs(AList[0]) + abs(AList[1])) / 2)
-    dA13 = abs(AList[0] - AList[2]) / ((abs(AList[0]) + abs(AList[2])) / 2)
-    dA23 = abs(AList[1] - AList[2]) / ((abs(AList[1]) + abs(AList[2])) / 2)
+    dA = abs(AList[0] - AList[1]) / ((abs(AList[0]) + abs(AList[1])) / 2)
+  
+    #Do the lines have equal areas of end "points"
+    dArea = AreaList.std() / AreaList.mean()
 
     #are the triples have equal length?
-    dD12 = abs(DistanceList[0] - DistanceList[1]) / ((abs(DistanceList[0]) + abs(DistanceList[1])) / 2)
-    dD13 = abs(DistanceList[0] - DistanceList[2]) / ((abs(DistanceList[0]) + abs(DistanceList[2])) / 2)
-    dD23 = abs(DistanceList[1] - DistanceList[2]) / ((abs(DistanceList[1]) + abs(DistanceList[2])) / 2)
-    if ((dA12 + dA13 + dA23) / 3 < Tol) and ((dD12 + dD13 + dD23) / 3 < Tol):
+    dL = abs(LengthList[0] - LengthList[1]) / ((abs(LengthList[0]) + abs(LengthList[1])) / 2)
+
+    if (dA < Tol) and (dL < Tol) and (dArea < Tol):
         return 1
     else:
         return 0
 #############################################################
 
+#Initial settings
+MinArea = 25
+MaxArea = 35
 
-im = misc.imread('Image5.jpg')
+
+#Load image
+im = misc.imread('Tuple0.jpg')
 W = im.shape[0]
 L = im.shape[1]
 im[im < 240] = 0
-#NumOfPoints = np.count_nonzero(im == 255)
-Clusters = []
-#PointCoord = []
 
-
+#Find separate blob clusters (line "points") as external contours
 _, contours0, hierarchy = cv2.findContours( im.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 
+#Choose blob clusters only in specified area region
 Clusters = []
 for k in xrange(len(contours0)):
-    if len(contours0[k]) > 15 and len(contours0[k]) < 45:
+    if len(contours0[k]) > MinArea and len(contours0[k]) < MaxArea:
         Clusters.append(contours0[k])
-
 Clusters = np.array(Clusters)
-#PointCoord = np.array(PointCoord)
 
 plt.imshow(im)
 ClusterCoord = np.zeros([Clusters.shape[0], 2])
-Y = np.zeros(Clusters.shape[0])
+#Y = np.zeros(Clusters.shape[0])
 
 #Find clusters' centres
 for i in xrange(Clusters.shape[0]):
@@ -108,58 +86,48 @@ for i in xrange(Clusters.shape[0]):
   plt.text(ClusterCoord[i,0],ClusterCoord[i,1],i)
 
 ClusterCoord = ClusterCoord.astype(int)
-plt.imshow(im)
 
-Triples = []
-Grids = []
-Distance = []
-A = []#list of line coefficients for triples (Ax + b)
+Lines = []
+Sides = []
+Length = []#list of lengths of lines
+A = []#list of angles for lines
 
-#Test 3 points to be the triple
+#Cnstruct line objects
 for p1 in xrange(ClusterCoord.shape[0]):
-    for p2 in xrange(ClusterCoord.shape[0]):
-        for p3 in xrange(ClusterCoord.shape[0]):
-            Cond1 = ((p1 == p2) or (p1 == p3) or (p2 == p3))
-            Cond2 = sorted([p1, p2, p3]) in Triples
-            if Cond1 or Cond2:
-                continue
-            else:
-                if isTriple(ClusterCoord[p1,:],ClusterCoord[p2,:],ClusterCoord[p3,:], A):
-                    Triples.append(sorted([p1, p2, p3]))
-		    Distance.append(dist(ClusterCoord[p1,:], ClusterCoord[p3,:]))
-                    print p1, p2, p3, A[-1], Distance[-1]
+    for p2 in xrange(p1 + 1,ClusterCoord.shape[0]):
+        if p1 == p2:
+            continue
+        else:
+            defineLine(ClusterCoord[p1,:],ClusterCoord[p2,:], A, Length)
+            Lines.append(sorted([p1, p2]))
+            print p1, p2, A[-1], Length[-1]
 
+#Test lines to be part of the parallelogram
+for l1 in xrange(len(Lines)):
+    for l2 in xrange(l1 + 1,len(Lines)):
+        if l1 == l2:
+            continue
+        else:
+            AList = [A[l1], A[l2]]
+            LengthList = [Length[l1], Length[l2]]
+            AreaList = np.array([len(Clusters[Lines[l1]][0]), len(Clusters[Lines[l1]][1]), len(Clusters[Lines[l2]][0]), len(Clusters[Lines[l2]][1])])
+            if isSide(AList, LengthList, AreaList):
+                Sides.append(sorted([l1, l2]))
+                print Lines[Sides[-1][0]], Lines[Sides[-1][1]]
 
-#Test 3 triples to be parallel to each other:
-for t1 in xrange(len(Triples)):
-    for t2 in xrange(len(Triples)):
-        for t3 in xrange(len(Triples)):
-            Cond1 = ((t1 == t2) or (t1 == t3) or (t2 == t3))
-            Cond2 = ((Triples[t1][0] == Triples[t2][0]) or (Triples[t1][0] == Triples[t3][0]) or (Triples[t2][0] == Triples[t3][0]))
-            Cond3 = ((Triples[t1][1] == Triples[t2][1]) or (Triples[t1][1] == Triples[t3][1]) or (Triples[t2][1] == Triples[t3][1]))
-            Cond4 = ((Triples[t1][2] == Triples[t2][2]) or (Triples[t1][2] == Triples[t3][2]) or (Triples[t2][2] == Triples[t3][2]))
-            Cond5 = sorted([Triples[t1], Triples[t2], Triples[t3]]) in Grids
-            if Cond1 or Cond2 or Cond3 or Cond4 or Cond5:
-                continue
-            else:
-                AList = [A[t1], A[t2], A[t3]]
-                DistanceList = [Distance[t1], Distance[t2], Distance[t3]]
-                if isGrid(t1, t2, t3, AList, DistanceList):
-                    Grids.append(sorted([Triples[t1], Triples[t2], Triples[t3]]))
-		    #print Triples[t1]
-                    #print Triples[t2]
-                    #print Triples[t3]
-                    #print "..."
-
-#Test triples to form the grid:
-Grids = np.array(Grids)
-for g1 in xrange(Grids.shape[0]):
-    for g2 in xrange(Grids.shape[0]):
-        if np.all(np.transpose(Grids[g1]) == Grids[g2]):
-            i = g1
+Sides = np.array(Sides)
+flag = 0
+for s1 in xrange(len(Sides)):
+    for s2 in xrange(len(Sides)):
+        P1 = Lines[Sides[s1][0]], Lines[Sides[s1][1]]
+        P2 = Lines[Sides[s2][0]], Lines[Sides[s2][1]]
+        if np.all(np.transpose(P1) == P2):
+            print "Marker is found!"
+            print P1
+            flag = 1
+            MarkerPts = np.reshape(P1, 4)
+            plt.plot(ClusterCoord[MarkerPts][:,0], ClusterCoord[MarkerPts][:,1],'o')
             break
+    if flag:
+        break
 
-print Grids[i]
-print "Grid is found!"
-GridPts = np.reshape(Grids[i], 9)
-plt.plot(ClusterCoord[GridPts][:,0], ClusterCoord[GridPts][:,1],'o')
