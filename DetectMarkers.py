@@ -13,6 +13,42 @@ def dist(p1, p2):
     return math.sqrt(pow(p1[0] - p2[0], 2) + pow(p1[1] - p2[1], 2))
 #############################################################
 
+#############################################################
+def MeanShift(frame,MarkerCoord):
+    MarkerCoordUpd = MarkerCoord
+    #Search with fixed number of steps
+    NumOfMeanShiftSteps = 3
+    WindowSize = 50#todo: should depend on scale
+    #plt.imshow(frame)
+    #plt.plot(MarkerCoord[0],MarkerCoord[1],'o')
+    for i in xrange(NumOfMeanShiftSteps):
+        XWindowLeft = MarkerCoordUpd[1] - WindowSize / 2
+        XWindowRigth = MarkerCoordUpd[1] + WindowSize / 2
+        YWindowDown = MarkerCoordUpd[0] - WindowSize / 2
+        YWindowUp = MarkerCoordUpd[0] + WindowSize / 2
+        frameW = frame[XWindowLeft:XWindowRigth,YWindowDown:YWindowUp]
+        _, contours, hierarchy = cv2.findContours( frameW.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        Area = []
+        for cont in contours:
+            Area.append(cv2.contourArea(cont))
+        Area = np.array(Area)
+        if Area.size:
+            idx = Area.argmax()
+            C = contours[idx]
+            N = C.shape[0]
+            C = C.squeeze()
+            C = C.reshape(N * 2, 1)
+            Y = np.array(C[1::2])
+            X = np.array(C[0::2])           
+            MarkerCoordUpd += np.array([X.mean().round(), Y.mean().round()]) - WindowSize / 2
+            #plt.plot(MarkerCoordUpd[0],MarkerCoordUpd[1],'o')
+            
+        else:
+            return (np.array([0, 0]), 0)
+    
+    return (MarkerCoordUpd, Area[idx])
+#############################################################
+
 
 #############################################################
 def isLine(p1, p2):
@@ -62,34 +98,45 @@ def isSide(LengthList, AreaList, CentersList):
 
 #Start
 #Initial settings
-MinArea = 30
-MaxArea = 40
+MinArea = 50
+MaxArea = 80
 MinLength = 70
 MaxLength = 90
+
 
 #cv windows
 flagCV = 1
 if flagCV:
     cap = cv2.VideoCapture(0)
     cv2.namedWindow('Debug')
+    MarkerFound = 0
 
     while(True):
         nt1 = cv2.getTickCount()
         ret, frameC = cap.read()
+        #picname = ['pic/Pic', str(nf), '.jpg']
+        #picname = ''.join(picname)
+        #frameC = cv2.imread(picname)
         W = frameC.shape[0]
         L = frameC.shape[1]
         frame = cv2.cvtColor(frameC, cv2.COLOR_BGR2GRAY)
         frame = cv2.adaptiveThreshold(frame,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,13,-3)
         _, contours0, hierarchy = cv2.findContours( frame.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 
+        
+        #picname = ['pic/Pic', str(nf), '.jpg']
+        #picname = ''.join(picname)
+        #cv2.imwrite(picname,frameC)
+
         #Choose blob clusters only in specified area region
         Clusters = []
         for k in xrange(len(contours0)):
-            if len(contours0[k]) > MinArea and len(contours0[k]) < MaxArea:
+            if cv2.contourArea(contours0[k]) > MinArea and cv2.contourArea(contours0[k]) < MaxArea:
                 Clusters.append(contours0[k])
                 
         Clusters = np.array(Clusters)
         ClusterCoord = np.zeros([Clusters.shape[0], 2])
+        cv2.fillPoly(frameC, pts = Clusters, color=(0,0,255))
         
         #Find clusters' centres
         for i in xrange(Clusters.shape[0]):
@@ -130,74 +177,98 @@ if flagCV:
                         Corners.append(sorted([l1, l2]))
 
         Corners = np.array(Corners)
-        MarkerFound = 0
-        Area = np.zeros(4)
-        for s1 in xrange(len(Corners)):
-            for s2 in xrange(len(Corners)):
-                P1 = np.sort(np.reshape([Lines[Corners[s1][0]], Lines[Corners[s1][1]]],4))
-                P2 = np.sort(np.reshape([Lines[Corners[s2][0]], Lines[Corners[s2][1]]],4))
-                m1 = m2 = n1 = n2 = 0
-                seen1 = []
-                seen2 = []
-                for num1 in P1:
-                    if num1 in seen1:
-                        n1 = 1
-                        Num1 = num1
-                    else:
-                        seen1.append(num1)
-                for num2 in P2:
-                    if num2 in seen2:
-                        n2 = 1
-                        Num2 = num2
-                    else:
-                        seen2.append(num2)
-                if n1 == n2 == 1:
-                    for k in xrange(4):
-                        if P1[k] in P2:
-                            m1 += 1
-                        if P2[k] in P1:
-                            m2 += 1
-           
-                if (m1 == m2 == 3)  and (Num1 != Num2):
-                    for k in P1:
-                        if (k != Num1) and (k != Num2):
-                            O1 = k
-                    for k in P2:
-                        if (k != Num1) and (k != Num2):
-                            O2 = k
-                    O = [O1,O2]
-                    O.sort()
-                    if not O in Lines:
-                        continue
-                    else:
-                        L0 = Length[Lines.index(O)]
-                        L1 = Length[Corners[s1][0]]
-                        L2 = Length[Corners[s1][1]]
-                        L3 = Length[Corners[s2][0]]
-                        L4 = Length[Corners[s2][1]]
-                        L = np.array([L0, L1, L2, L3, L4])
-                        if L.std() / L.mean() < 0.1:               
-                            M = np.concatenate((P1,P2), axis = 0)
-                            MarkerPts = []
-                            for k in M:
-                                if k in MarkerPts:
-                                    continue
-                                else:
-                                    MarkerPts.append(k)
-                            for x in xrange(4):
-                                frameC = cv2.circle(frameC,tuple(ClusterCoord[MarkerPts[x]].astype(int)), 12, (0,255,0), -1)
-                                Area[x] = len(Clusters[MarkerPts[x]])
-                            MarkerFound = 1
-                            MinArea = np.round(Area.min() - 0.1 * Area.mean())
-                            MaxArea = np.round(Area.max() + 0.1 * Area.mean())
-                            MinLength = np.round(L.min() - 0.1 * L.mean())
-                            MaxLength = np.round(L.max() + 0.1 * L.mean())
-                            break
-               
-                if MarkerFound:
+        if MarkerFound:
+            frameF = np.zeros(frame.shape, dtype=np.uint8)
+            for x in xrange(len(Clusters)):
+                C = Clusters[x]
+            	N = C.shape[0]
+            	C = C.squeeze()
+            	C = C.reshape(N * 2, 1)
+            	X = C[1::2]
+            	Y = C[0::2]
+            	frameF[X,Y] = 255
+
+            for m in xrange(4):
+                MarkerCoord[m],Area[m] = MeanShift(frame,MarkerCoord[m])
+                if not MarkerCoord[m].any():
+                    MarkerFound = 0
                     break
+                else:
+                    frameC = cv2.circle(frameC,tuple(MarkerCoord[m].astype(int)), 5, (0,255,255), -1)
+        else:
+            Area = np.zeros(4)
+            for s1 in xrange(len(Corners)):
+                for s2 in xrange(len(Corners)):
+                    P1 = np.sort(np.reshape([Lines[Corners[s1][0]], Lines[Corners[s1][1]]],4))
+                    P2 = np.sort(np.reshape([Lines[Corners[s2][0]], Lines[Corners[s2][1]]],4))
+                    m1 = m2 = n1 = n2 = 0
+                    seen1 = []
+                    seen2 = []
+                    for num1 in P1:
+                        if num1 in seen1:
+                            n1 = 1
+                            Num1 = num1
+                        else:
+                            seen1.append(num1)
+                    for num2 in P2:
+                        if num2 in seen2:
+                            n2 = 1
+                            Num2 = num2
+                        else:
+                            seen2.append(num2)
+                    if n1 == n2 == 1:
+                        for k in xrange(4):
+                            if P1[k] in P2:
+                                m1 += 1
+                            if P2[k] in P1:
+                                m2 += 1
+           
+                    if (m1 == m2 == 3)  and (Num1 != Num2):
+                        for k in P1:
+                            if (k != Num1) and (k != Num2):
+                                O1 = k
+                        for k in P2:
+                            if (k != Num1) and (k != Num2):
+                                O2 = k
+                        O = [O1,O2]
+                        O.sort()
+                        if not O in Lines:
+                            continue
+                        else:
+                            L0 = Length[Lines.index(O)]
+                            L1 = Length[Corners[s1][0]]
+                            L2 = Length[Corners[s1][1]]
+                            L3 = Length[Corners[s2][0]]
+                            L4 = Length[Corners[s2][1]]
+                            L = np.array([L0, L1, L2, L3, L4])
+                            if L.std() / L.mean() < 0.1:               
+                                M = np.concatenate((P1,P2), axis = 0)
+                                MarkerPts = []
+                                for k in M:
+                                    if k in MarkerPts:
+                                        continue
+                                    else:
+                                        MarkerPts.append(k)
+
+                                MarkerCoord = []
+                                for x in xrange(4):
+                                    frameC = cv2.circle(frameC,tuple(ClusterCoord[MarkerPts[x]].astype(int)), 12, (0,255,0), -1)
+                                    MarkerCoord.append(ClusterCoord[MarkerPts[x]].astype(int))
+                                    Area[x] = cv2.contourArea(Clusters[MarkerPts[x]])
+                                
+                                MarkerFound = 1
+                            
+                                MinArea = np.round(Area.min() - 0.1 * Area.mean())
+                                MaxArea = np.round(Area.max() + 0.1 * Area.mean())
+                                MinLength = np.round(L.min() - 0.1 * L.mean())
+                                MaxLength = np.round(L.max() + 0.1 * L.mean())
+                                break
+               
+                    if MarkerFound:
+                        break
         
         
+        #plt.imshow(frameF)
         tf = cv2.getTickFrequency()
         nt2 = cv2.getTickCount()
         fps = cap.get(cv2.CAP_PROP_FPS)
@@ -213,9 +284,9 @@ if flagCV:
         DebugImg = np.zeros((150,120,3), dtype=np.int8)
         for t in xrange(len(debugInfo)): 
             cv2.putText(DebugImg,debugInfo[t],(25,25+15*t), cv2.FONT_HERSHEY_SIMPLEX, 0.4,(255,255,255),1,cv2.LINE_AA)
-        cv2.fillPoly(frameC, pts = Clusters, color=(0,0,255))
         cv2.imshow('Debug',DebugImg)
         cv2.imshow('frame',frameC)
+        cv2.imshow('Clusters',frame)
     
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
