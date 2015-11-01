@@ -65,7 +65,7 @@ def isLine(p1, p2):
 #############################################################
 
 #############################################################
-def isSide(LengthList, AreaList, CentersList):
+def isCorner(LengthList, AreaList, CentersList):
     #test given tuple of lines to be perpendicular to each 
     #other and have equal lengths and equal areas of their
     # "points" (blob clusters).
@@ -102,12 +102,14 @@ MinArea = 50
 MaxArea = 80
 MinLength = 70
 MaxLength = 90
-
+LengthRef = (MinLength + MaxLength) / 2
 
 #cv windows
 flagCV = 1
 if flagCV:
     cap = cv2.VideoCapture(0)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 960)
     cv2.namedWindow('Debug')
     MarkerFound = 0
 
@@ -118,76 +120,10 @@ if flagCV:
         #picname = ''.join(picname)
         #frameC = cv2.imread(picname)
         W = frameC.shape[0]
-        L = frameC.shape[1]
+        H = frameC.shape[1]
         frame = cv2.cvtColor(frameC, cv2.COLOR_BGR2GRAY)
         frame = cv2.adaptiveThreshold(frame,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,13,-3)
-        _, contours0, hierarchy = cv2.findContours( frame.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-
-        
-        #picname = ['pic/Pic', str(nf), '.jpg']
-        #picname = ''.join(picname)
-        #cv2.imwrite(picname,frameC)
-
-        #Choose blob clusters only in specified area region
-        Clusters = []
-        for k in xrange(len(contours0)):
-            if cv2.contourArea(contours0[k]) > MinArea and cv2.contourArea(contours0[k]) < MaxArea:
-                Clusters.append(contours0[k])
-                
-        Clusters = np.array(Clusters)
-        ClusterCoord = np.zeros([Clusters.shape[0], 2])
-        cv2.fillPoly(frameC, pts = Clusters, color=(0,0,255))
-        
-        #Find clusters' centres
-        for i in xrange(Clusters.shape[0]):
-            ClusterCoord[i] = [Clusters[i][:,0][:,0].mean().round(), Clusters[i][:,0][:,1].mean().round()]
-            #frameC = cv2.circle(frameC,tuple(ClusterCoord[i].astype(int)), 4, (0,0,255), -1)
-
-        ClusterCoord = ClusterCoord.astype(int)
-
-        Lines = []
-        Length = []
-        Corners = []
-
-        #Construct line objects
-        for p1 in xrange(ClusterCoord.shape[0]):
-            for p2 in xrange(p1 + 1,ClusterCoord.shape[0]):
-                if p1 == p2:
-                   continue
-                else:
-                   L = isLine(ClusterCoord[p1,:],ClusterCoord[p2,:])
-                   if L:
-                       Length.append(L)
-                       Lines.append(sorted([p1, p2]))
-                       frameC = cv2.line(frameC,tuple(ClusterCoord[p1,:]),\
-                           tuple(ClusterCoord[p2,:]),(255,0,0),1)
-
-        #Test lines to be perpendicular and equal
-        for l1 in xrange(len(Lines)):
-            for l2 in xrange(l1 + 1,len(Lines)):
-                if (l1 == l2):
-                    continue
-                else:
-                    LengthList = [Length[l1], Length[l2]]
-                    AreaList = np.array([len(Clusters[Lines[l1]][0]), len(Clusters[Lines[l1]][1]),\
-                        len(Clusters[Lines[l2]][0]), len(Clusters[Lines[l2]][1])])
-                    CentersList = [ClusterCoord[Lines[l1]][0], ClusterCoord[Lines[l1]][1],\
-                        ClusterCoord[Lines[l2]][0], ClusterCoord[Lines[l2]][1]]
-                    if isSide(LengthList, AreaList, CentersList):
-                        Corners.append(sorted([l1, l2]))
-
-        Corners = np.array(Corners)
         if MarkerFound:
-            frameF = np.zeros(frame.shape, dtype=np.uint8)
-            for x in xrange(len(Clusters)):
-                C = Clusters[x]
-            	N = C.shape[0]
-            	C = C.squeeze()
-            	C = C.reshape(N * 2, 1)
-            	X = C[1::2]
-            	Y = C[0::2]
-            	frameF[X,Y] = 255
-
             for m in xrange(4):
                 MarkerCoord[m],Area[m] = MeanShift(frame,MarkerCoord[m])
                 if not MarkerCoord[m].any():
@@ -196,6 +132,56 @@ if flagCV:
                 else:
                     frameC = cv2.circle(frameC,tuple(MarkerCoord[m].astype(int)), 5, (0,255,255), -1)
         else:
+            _, contours0, hierarchy = cv2.findContours( frame.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        
+            #Choose blob clusters only in specified area region
+            Clusters = []
+            for k in xrange(len(contours0)):
+                if cv2.contourArea(contours0[k]) > MinArea and cv2.contourArea(contours0[k]) < MaxArea:
+                    Clusters.append(contours0[k])
+                
+            Clusters = np.array(Clusters)
+            ClusterCoord = np.zeros([Clusters.shape[0], 2])
+            cv2.fillPoly(frameC, pts = Clusters, color=(0,0,255))
+        
+            #Find clusters' centres
+            for i in xrange(Clusters.shape[0]):
+                ClusterCoord[i] = [Clusters[i][:,0][:,0].mean().round(), Clusters[i][:,0][:,1].mean().round()]
+
+            ClusterCoord = ClusterCoord.astype(int)
+
+            Lines = []
+            Length = []
+            Corners = []
+
+            #Construct line objects
+            for p1 in xrange(ClusterCoord.shape[0]):
+                for p2 in xrange(p1 + 1,ClusterCoord.shape[0]):
+                    if p1 == p2:
+                       continue
+                    else:
+                       L = isLine(ClusterCoord[p1,:],ClusterCoord[p2,:])
+                       if L:
+                           Length.append(L)
+                           Lines.append(sorted([p1, p2]))
+                           frameC = cv2.line(frameC,tuple(ClusterCoord[p1,:]),\
+                               tuple(ClusterCoord[p2,:]),(255,0,0),1)
+
+            #Test lines to be perpendicular and equal
+            for l1 in xrange(len(Lines)):
+                for l2 in xrange(l1 + 1,len(Lines)):
+                    if (l1 == l2):
+                        continue
+                    else:
+                        LengthList = [Length[l1], Length[l2]]
+                        AreaList = np.array([len(Clusters[Lines[l1]][0]), len(Clusters[Lines[l1]][1]),\
+                            len(Clusters[Lines[l2]][0]), len(Clusters[Lines[l2]][1])])
+                        CentersList = [ClusterCoord[Lines[l1]][0], ClusterCoord[Lines[l1]][1],\
+                            ClusterCoord[Lines[l2]][0], ClusterCoord[Lines[l2]][1]]
+                        if isCorner(LengthList, AreaList, CentersList):
+                            Corners.append(sorted([l1, l2]))
+        
+            Corners = np.array(Corners)
             Area = np.zeros(4)
             for s1 in xrange(len(Corners)):
                 for s2 in xrange(len(Corners)):
@@ -275,18 +261,21 @@ if flagCV:
         debugInfo = []
         debugInfo.append(str(len(Clusters)))
         debugInfo.append(str(tf * 1 / (nt2 - nt1)))
-        debugInfo.append(str(fps))
+        debugInfo.append(str(1000 * ((nt2 - nt1) / tf)))
         debugInfo.append(str(MinArea))
         debugInfo.append(str(MaxArea))
         debugInfo.append(str(MinLength))
         debugInfo.append(str(MaxLength))
+
+        #Draw rectangle for marker reference
+        cv2.rectangle(frameC, (H / 2, W / 2), (H / 2 + LengthRef, W / 2 + LengthRef), (0,255,0), 1)
     
         DebugImg = np.zeros((150,120,3), dtype=np.int8)
         for t in xrange(len(debugInfo)): 
             cv2.putText(DebugImg,debugInfo[t],(25,25+15*t), cv2.FONT_HERSHEY_SIMPLEX, 0.4,(255,255,255),1,cv2.LINE_AA)
         cv2.imshow('Debug',DebugImg)
         cv2.imshow('frame',frameC)
-        cv2.imshow('Clusters',frame)
+        #cv2.imshow('Clusters',frame)
     
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
