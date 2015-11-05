@@ -17,17 +17,15 @@ def dist(p1, p2):
 def MeanShift(frame,MarkerCoord):
     MarkerCoordUpd = MarkerCoord
     #Search with fixed number of steps
-    NumOfMeanShiftSteps = 3
-    WindowSize = 50#todo: should depend on scale
-    #plt.imshow(frame)
-    #plt.plot(MarkerCoord[0],MarkerCoord[1],'o')
+    NumOfMeanShiftSteps = 2
+    WindowSize = 90#todo: should depend on scale
     for i in xrange(NumOfMeanShiftSteps):
         XWindowLeft = MarkerCoordUpd[1] - WindowSize / 2
         XWindowRigth = MarkerCoordUpd[1] + WindowSize / 2
         YWindowDown = MarkerCoordUpd[0] - WindowSize / 2
         YWindowUp = MarkerCoordUpd[0] + WindowSize / 2
         frameW = frame[XWindowLeft:XWindowRigth,YWindowDown:YWindowUp]
-        _, contours, hierarchy = cv2.findContours( frameW.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        _, contours, _ = cv2.findContours( frameW.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
         Area = []
         for cont in contours:
             Area.append(cv2.contourArea(cont))
@@ -41,8 +39,6 @@ def MeanShift(frame,MarkerCoord):
             Y = np.array(C[1::2])
             X = np.array(C[0::2])           
             MarkerCoordUpd += np.array([X.mean().round(), Y.mean().round()]) - WindowSize / 2
-            #plt.plot(MarkerCoordUpd[0],MarkerCoordUpd[1],'o')
-            
         else:
             return (np.array([0, 0]), 0)
     
@@ -86,7 +82,7 @@ def isCorner(LengthList, AreaList, CentersList):
     #Do the lines have equal areas of end "points"
     dArea = AreaList.std() / AreaList.mean()
 
-    #are the triples have equal length?
+    #are the lines have equal length?
     dL = abs(LengthList[0] - LengthList[1]) / ((abs(LengthList[0]) + abs(LengthList[1])) / 2)
 
     if (dL < Tol) and (dArea < Tol) and (dA < Tol):
@@ -95,14 +91,38 @@ def isCorner(LengthList, AreaList, CentersList):
         return 0
 #############################################################
 
+#############################################################
+def TestMarker(MarkerCoord):
+    Lengths = np.zeros(4)
+    for n in xrange(4):
+        if n == 3:
+            Lengths[n] = dist(MarkerCoord[3], MarkerCoord[0])
+        else:
+            Lengths[n] = dist(MarkerCoord[n], MarkerCoord[n + 1])
+
+    LengthMean = Lengths.mean()
+    
+    if Lengths.std() / LengthMean < 0.1:
+        return (1, LengthMean)
+    else:
+        return (0, LengthMean)
+
+#############################################################
+
 
 #Start
 #Initial settings
-MinArea = 50
-MaxArea = 80
-MinLength = 70
-MaxLength = 90
-LengthRef = (MinLength + MaxLength) / 2
+MeanArea = 65.0
+dArea = 15.0
+MeanLength = 80.0
+dLength = 10.0
+MarkerCoord = np.zeros((4,2), dtype=np.int32)
+dXhist0 = []
+MFhist = []
+AcaclHist = []
+XPrev = 0
+YPrev = 0
+
 
 #cv windows
 flagCV = 1
@@ -114,7 +134,7 @@ if flagCV:
     MarkerFound = 0
 
     while(True):
-        nt1 = cv2.getTickCount()
+        #nt1 = cv2.getTickCount()
         ret, frameC = cap.read()
         #picname = ['pic/Pic', str(nf), '.jpg']
         #picname = ''.join(picname)
@@ -122,8 +142,16 @@ if flagCV:
         W = frameC.shape[0]
         H = frameC.shape[1]
         frame = cv2.cvtColor(frameC, cv2.COLOR_BGR2GRAY)
+        
         frame = cv2.adaptiveThreshold(frame,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,13,-3)
+        nt1 = cv2.getTickCount()
+
+        MinArea = MeanArea - dArea
+        MaxArea = MeanArea + dArea
+   	MinLength = MeanLength - dLength
+    	MaxLength = MeanLength + dLength
         if MarkerFound:
+            
             for m in xrange(4):
                 MarkerCoord[m],Area[m] = MeanShift(frame,MarkerCoord[m])
                 if not MarkerCoord[m].any():
@@ -131,8 +159,11 @@ if flagCV:
                     break
                 else:
                     frameC = cv2.circle(frameC,tuple(MarkerCoord[m].astype(int)), 5, (0,255,255), -1)
+            MarkerFound, MeanLength = TestMarker(MarkerCoord)
+            MeanArea = math.pow(MeanLength / 10, 2)#based on marker geometry
+            
         else:
-            _, contours0, hierarchy = cv2.findContours( frame.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+            _, contours0, _ = cv2.findContours( frame.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
         
             #Choose blob clusters only in specified area region
             Clusters = []
@@ -243,42 +274,51 @@ if flagCV:
                                     Area[x] = cv2.contourArea(Clusters[MarkerPts[x]])
                                 
                                 MarkerFound = 1
-                            
-                                MinArea = np.round(Area.min() - 0.1 * Area.mean())
-                                MaxArea = np.round(Area.max() + 0.1 * Area.mean())
-                                MinLength = np.round(L.min() - 0.1 * L.mean())
-                                MaxLength = np.round(L.max() + 0.1 * L.mean())
                                 break
                
                     if MarkerFound:
                         break
         
         
+	
         #plt.imshow(frameF)
         tf = cv2.getTickFrequency()
         nt2 = cv2.getTickCount()
         fps = cap.get(cv2.CAP_PROP_FPS)
+        dXhist0.append(XPrev - MarkerCoord[0][0])
+        MFhist.append(MarkerFound)
+        AcaclHist.append(MeanArea)
+        XPrev = MarkerCoord[0][0]
         debugInfo = []
-        debugInfo.append(str(len(Clusters)))
+        debugInfo.append(str(MarkerFound))
         debugInfo.append(str(tf * 1 / (nt2 - nt1)))
         debugInfo.append(str(1000 * ((nt2 - nt1) / tf)))
-        debugInfo.append(str(MinArea))
-        debugInfo.append(str(MaxArea))
-        debugInfo.append(str(MinLength))
-        debugInfo.append(str(MaxLength))
+        debugInfo.append(str(MeanLength))
+        debugInfo.append(str(MeanArea))
 
         #Draw rectangle for marker reference
-        cv2.rectangle(frameC, (H / 2, W / 2), (H / 2 + LengthRef, W / 2 + LengthRef), (0,255,0), 1)
+        cv2.rectangle(frameC, (H / 2, W / 2), (H / 2 + int(MeanLength), W / 2 + int(MeanLength)), (0,255,0), 1)
+        for Coord in MarkerCoord:
+            cv2.rectangle(frameC, (Coord[0] - 45, Coord[1] - 45), (Coord[0] + 45, Coord[1] + 45), (0,0,255), 1)
     
         DebugImg = np.zeros((150,120,3), dtype=np.int8)
         for t in xrange(len(debugInfo)): 
             cv2.putText(DebugImg,debugInfo[t],(25,25+15*t), cv2.FONT_HERSHEY_SIMPLEX, 0.4,(255,255,255),1,cv2.LINE_AA)
         cv2.imshow('Debug',DebugImg)
         cv2.imshow('frame',frameC)
+        
         #cv2.imshow('Clusters',frame)
     
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
+    
+    dXhist0 = np.array(dXhist0)
+    dXhist0[dXhist0 < -100] = 0
+    plt.subplot(2,1,1)
+    plt.plot(MFhist)
+    plt.subplot(2,1,2)
+    plt.plot(AcaclHist)
+
     
     cap.release()
     cv2.destroyAllWindows()
