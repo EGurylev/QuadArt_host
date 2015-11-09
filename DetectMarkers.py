@@ -14,11 +14,11 @@ def dist(p1, p2):
 #############################################################
 
 #############################################################
-def MeanShift(frame,MarkerCoord):
+def MeanShift(frame,MarkerCoord,Length):
     MarkerCoordUpd = MarkerCoord
     #Search with fixed number of steps
     NumOfMeanShiftSteps = 2
-    WindowSize = 90#todo: should depend on scale
+    WindowSize = Length
     for i in xrange(NumOfMeanShiftSteps):
         XWindowLeft = MarkerCoordUpd[1] - WindowSize / 2
         XWindowRigth = MarkerCoordUpd[1] + WindowSize / 2
@@ -134,35 +134,55 @@ if flagCV:
     MarkerFound = 0
 
     while(True):
-        #nt1 = cv2.getTickCount()
         ret, frameC = cap.read()
+        nt1 = cv2.getTickCount()
         #picname = ['pic/Pic', str(nf), '.jpg']
         #picname = ''.join(picname)
         #frameC = cv2.imread(picname)
         W = frameC.shape[0]
         H = frameC.shape[1]
-        frame = cv2.cvtColor(frameC, cv2.COLOR_BGR2GRAY)
+            
         
-        frame = cv2.adaptiveThreshold(frame,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,13,-3)
-        nt1 = cv2.getTickCount()
 
         MinArea = MeanArea - dArea
         MaxArea = MeanArea + dArea
    	MinLength = MeanLength - dLength
     	MaxLength = MeanLength + dLength
         if MarkerFound:
+            MarkerCenter = [int(round(np.mean([MarkerCoord[0][0], MarkerCoord[1][0], MarkerCoord[2][0], \
+                MarkerCoord[3][0]]))), int(round(np.mean([MarkerCoord[0][1], MarkerCoord[1][1], \
+                MarkerCoord[2][1], MarkerCoord[3][1]])))]
+            X1 = MarkerCenter[0] - int(1.5 * MeanLength)
+            X2 = MarkerCenter[0] + int(1.5 * MeanLength)
+            Y1 = MarkerCenter[1] - int(1.5 * MeanLength)
+            Y2 = MarkerCenter[1] + int(1.5 * MeanLength)
+            MarkerFrame = frameC[Y1:Y2, X1:X2]
+            cv2.rectangle(frameC, (X1, Y1), (X2, Y2), (255,255,255), 1)
+            frame = cv2.cvtColor(MarkerFrame, cv2.COLOR_BGR2GRAY)
+            frame = cv2.adaptiveThreshold(frame,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,13,-3)
             
+            MarkerCoord -= np.array([X1, Y1])
             for m in xrange(4):
-                MarkerCoord[m],Area[m] = MeanShift(frame,MarkerCoord[m])
+                MarkerCoord[m], Area[m] = MeanShift(frame,MarkerCoord[m],MeanLength)
                 if not MarkerCoord[m].any():
                     MarkerFound = 0
                     break
-                else:
-                    frameC = cv2.circle(frameC,tuple(MarkerCoord[m].astype(int)), 5, (0,255,255), -1)
+            
+            MarkerCoord += np.array([X1, Y1])
+            for m in xrange(4):
+                frameC = cv2.circle(frameC,tuple(MarkerCoord[m].astype(int)), 5, (0,255,255), -1)
+
             MarkerFound, MeanLength = TestMarker(MarkerCoord)
             MeanArea = math.pow(MeanLength / 10, 2)#based on marker geometry
+            Shift = MeanLength / 2#half of window size
+            Shift = Shift.astype(int)
+            for Coord in MarkerCoord:
+                cv2.rectangle(frameC, (Coord[0] - Shift, Coord[1] - Shift), \
+                    (Coord[0] + Shift, Coord[1] + Shift), (0,0,255), 1)
             
         else:
+            frame = cv2.cvtColor(frameC, cv2.COLOR_BGR2GRAY)
+            frame = cv2.adaptiveThreshold(frame,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,13,-3)
             _, contours0, _ = cv2.findContours( frame.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
         
             #Choose blob clusters only in specified area region
@@ -287,7 +307,7 @@ if flagCV:
         fps = cap.get(cv2.CAP_PROP_FPS)
         dXhist0.append(XPrev - MarkerCoord[0][0])
         MFhist.append(MarkerFound)
-        AcaclHist.append(MeanArea)
+        
         XPrev = MarkerCoord[0][0]
         debugInfo = []
         debugInfo.append(str(MarkerFound))
@@ -296,10 +316,10 @@ if flagCV:
         debugInfo.append(str(MeanLength))
         debugInfo.append(str(MeanArea))
 
+        AcaclHist.append(1000 * ((nt2 - nt1) / tf))
+
         #Draw rectangle for marker reference
         cv2.rectangle(frameC, (H / 2, W / 2), (H / 2 + int(MeanLength), W / 2 + int(MeanLength)), (0,255,0), 1)
-        for Coord in MarkerCoord:
-            cv2.rectangle(frameC, (Coord[0] - 45, Coord[1] - 45), (Coord[0] + 45, Coord[1] + 45), (0,0,255), 1)
     
         DebugImg = np.zeros((150,120,3), dtype=np.int8)
         for t in xrange(len(debugInfo)): 
