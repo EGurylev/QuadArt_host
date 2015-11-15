@@ -1,7 +1,10 @@
 from scipy import integrate
 import numpy as np
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+import mpl_toolkits.mplot3d.art3d as art3d
 import math
+import time
 
 
 def RHS(y,t): 
@@ -40,7 +43,9 @@ def RHS(y,t):
     return deriv
 
 # simulation time
-time = np.linspace(0.0,10.0,1000)
+N = 100
+Tend = 1.0
+Time = np.linspace(0.0,Tend,N)
 
 # model constants
 g = 9.81 # gravity acceleration
@@ -54,18 +59,45 @@ k2 = 1; # coefficient which relates torque with command signals
 
 # initial values
 PosGi = np.array([0,0,0]) # global position
-VelBi = np.array([0.5,0,0]) # body linear velocity
+VelBi = np.array([0,0.1,0]) # body linear velocity
 AnglesGi = np.array([0,0,0]) # global angles (Euler)
-OmegaBi = np.array([0,0,0.4]) # body angular velocity
+OmegaBi = np.array([0,0,0.3]) # body angular velocity
 yinit = np.concatenate([VelBi, PosGi, AnglesGi, OmegaBi])
 
 # forces and moments
 F = 10
 tau_phi = 0.1
-tau_theta = 0.25
+tau_theta = 0.1
 tau_psi = 0.1
 
-y = integrate.odeint(RHS,yinit,time)
+y = integrate.odeint(RHS,yinit,Time)
 
 # display simulation results
-plt.plot(time,y[:,0])
+
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+
+ax.set_xlim3d(min(y[:,3]), max(y[:,3]))
+ax.set_ylim3d(min(y[:,4]), max(y[:,4]))
+ax.set_zlim3d(min(y[:,5]), max(y[:,5]))
+
+PosInit = 0.5 * np.array([[-l,0,0,l,0],[0,l,-l,0,0],[0,0,0,0,0],[2,2,2,2,2]])
+q, = plt.plot(PosInit[0], PosInit[1], PosInit[2], 'o')
+
+for n in xrange(N):
+    Rx = np.array([[1, 0, 0], [0, math.cos(y[n,6]), -math.sin(y[n,6])], [0, math.sin(y[n,6]), math.cos(y[n,6])]])
+    Ry = np.array([[math.cos(y[n,7]), 0, math.sin(y[n,7])], [0, 1, 0], [-math.sin(y[n,7]), 0, math.cos(y[n,7])]])
+    Rz = np.array([[math.cos(y[n,8]), -math.sin(y[n,8]), 0], [math.sin(y[n,8]), math.cos(y[n,8]), 0], [0, 0, 1]])
+    R = np.dot(Rx,Ry)
+    R = np.dot(R,Rz)
+    P = y[n,3:6]
+    T1 = np.concatenate((R.T, [P]),axis=0)
+    T1 = np.concatenate((T1.T, [np.array([0, 0, 0, 1])]),axis=0)
+    
+    Pos = np.dot(T1, PosInit)
+    q.set_data(Pos[0:2])
+    q.set_3d_properties(Pos[2])
+    plt.draw()
+    time.sleep(Tend/N)
+
+
