@@ -1,21 +1,12 @@
-from control_lib import pid
-from scipy import integrate
-import numpy as np
-import matplotlib.pyplot as plt
-import math
+import root as r
+import quad_model
 from pyqtgraph.Qt import QtGui, QtCore
-import numpy as np
 import pyqtgraph as pg
 import pyqtgraph.opengl as gl
-
-
-F = 10
-tau_phi = 0.1
-tau_theta = 0.1
-tau_psi = 0.1
-Tend = 0.5
-dt = 0.02
-t = 0
+from control_lib import pid
+import math
+import numpy as np
+from scipy import integrate
 
 # model constants
 g = 9.81 # gravity acceleration
@@ -24,14 +15,12 @@ l = 0.2 # length of arm
 Jxx = M * math.pow(l,2); # moment of inertia according to x axis
 Jyy = M * math.pow(l,2); # moment of inertia according to y axis
 Jzz = 2 * M * math.pow(l,2); # moment of inertia according to z axis
-k1 = 0.981; # coefficient which relates force with command signals
-k2 = 1; # coefficient which relates torque with command signals
 
 # initial values
 PosGi = np.array([0,0,0]) # global position
-VelBi = np.array([0,0.1,0]) # body linear velocity
+VelBi = np.array([0,0,0]) # body linear velocity
 AnglesGi = np.array([0,0,0]) # global angles (Euler)
-OmegaBi = np.array([0,0,0.3]) # body angular velocity
+OmegaBi = np.array([0,0,0]) # body angular velocity
 y = np.concatenate([VelBi, PosGi, AnglesGi, OmegaBi])
 y = np.concatenate([[y],[y]])
 # window initialization
@@ -41,68 +30,49 @@ view.show()
 grid = gl.GLGridItem()
 view.addItem(grid)	
 PosInit = 0.5 * np.array([[-l,0,0,l,0],[0,l,-l,0,0],[0,0,0,0,0],[2,2,2,2,2]])
+pos = quad_model.AffineTransform(y[1], PosInit)
 scatter = pg.opengl.GLScatterPlotItem()
-scatter.setData(pos=PosInit[0:3,:].T,color=(1,0,0,.3))
+scatter.setData(pos=pos[0:3,:].T,color=(1,0,0,.3))
 view.addItem(scatter)
 Timer = QtCore.QTimer()
 
-def RHS(y,t): 
-    # return derivatives of the array y
-    deriv = np.zeros(12)
-    
-    v_x, v_y, v_z = y[0], y[1], y[2] # linear velocities
-    X, Y, Z = y[3], y[4], y[5] # positions
-    phi, theta, psi = y[6], y[7], y[8] # Euler angles
-    omega_x, omega_y, omega_z = y[9], y[10], y[11] #angular velocity
-    # Body linear velocities
-    deriv[0] = omega_z * v_y - omega_y * v_z + g * math.sin(theta)
-    deriv[1] = omega_x * v_z - omega_z * v_x - g * math.cos(theta) * math.sin(phi)
-    deriv[2] = omega_y * v_x - omega_x * v_y - g * math.cos(theta) * math.cos(phi) + F / M
-    # Global positions
-    deriv[3] = math.cos(theta) * math.cos(psi) * v_x + \
-         ( math.sin(phi) * math.sin(theta) * math.cos(psi) - math.cos(phi) * math.sin(psi) ) * v_y + \
-                       ( math.cos(phi) * math.sin(theta) * math.cos(psi) + math.sin(phi) * math.sin(psi) ) * v_z
-    deriv[4] = math.cos(theta) * math.sin(psi) * v_x + \
-          ( math.sin(phi) * math.sin(theta) * math.sin(psi) + math.cos(phi) * math.cos(psi) ) * v_y + \
-          ( math.cos(phi) * math.sin(theta) * math.sin(psi) - math.sin(phi) * math.cos(psi) ) * v_z
-    deriv[5] = -math.sin(theta) * v_x + math.sin(phi) * math.cos(theta) * v_y + \
-          math.cos(phi) * math.cos(theta) * v_z
-    # Global angles
-    deriv[6] = omega_x + math.sin(phi) * math.tan(theta) * omega_y + math.cos(phi) * math.tan(theta) * omega_z
-    deriv[7] = math.cos(phi) * omega_y - math.sin(phi) * omega_z
-    deriv[8] = math.sin(phi) / math.cos(theta) * omega_y + math.cos(phi) / math.cos(theta) * omega_z
-    # Body angiular velocities
-    deriv[9] = (Jyy - Jzz) / Jxx * omega_y * omega_z + tau_phi / Jxx
-    deriv[10] = (Jzz - Jxx) / Jyy * omega_x * omega_z + tau_theta / Jyy
-    deriv[11] = (Jxx - Jyy) / Jzz * omega_x * omega_y + tau_psi / Jzz
-    return deriv   
-        
+# Controller initialization
+ZController = pid(0.5,0,0.5,r.dt)
+ZController.setpoint = 0.0
+PsiController = pid(0.5,0,0.5,r.dt)
+PsiController.setpoint = 0
+
+XController = pid(0.2,0,0.1,r.dt)
+XController.setpoint = 1
+ThetaController = pid(0.1,0,0.1,r.dt)
+
+YController = pid(0.2,0,0.1,r.dt)
+YController.setpoint = 2.6
+PhiController = pid(0.1,0,0.1,r.dt)
 
 def update():
-    global t, Tend, scatter, dt, y, Timer
-    if t <= Tend:
-        y = integrate.odeint(RHS,y[1],np.array([t, t + dt]))
-        t = t + dt
-        pos = AffineTransform(y[1], PosInit)
+    global scatter, y, Timer
+    if r.t <= r.Tend:
+        y = integrate.odeint(quad_model.RHS,y[1],np.array([r.t, r.t + r.dt]))
+        r.t = r.t + r.dt
+        pos = quad_model.AffineTransform(y[1], PosInit)
         scatter.setData(pos=pos[0:3,:].T,color=(1,0,0,.3))
+        
+        # Feedback control system
+        # Z control
+        r.F = ZController.evaluate(y[1][5])
+        r.F += M * g
+        # Cascade control of X
+        ThetaController.setpoint = XController.evaluate(y[1][3])# control X
+        r.tau_theta = ThetaController.evaluate(y[1][7])# control roll
+        # Cascade control of Y
+        PhiController.setpoint = -YController.evaluate(y[1][4])# control Y
+        r.tau_phi = PhiController.evaluate(y[1][6])# control pitch
+        # Yaw control
+        r.tau_psi = PsiController.evaluate(y[1][8])
     else:
-        Timer.stop() 
-
-def AffineTransform(y, PosInit):
-   Rx = np.array([[1, 0, 0], [0, math.cos(y[6]), -math.sin(y[6])], \
-       [0, math.sin(y[6]), math.cos(y[6])]])
-   Ry = np.array([[math.cos(y[7]), 0, math.sin(y[7])], [0, 1, 0],  \
-       [-math.sin(y[7]), 0, math.cos(y[7])]])
-   Rz = np.array([[math.cos(y[8]), -math.sin(y[8]), 0],  \
-       [math.sin(y[8]), math.cos(y[8]), 0], [0, 0, 1]])
-   R = np.dot(Rx,Ry)
-   R = np.dot(R,Rz)
-   P = y[3:6]
-   T1 = np.concatenate((R.T, [P]),axis=0)
-   T1 = np.concatenate((T1.T, [np.array([0, 0, 0, 1])]),axis=0)
-   pos = np.dot(T1, PosInit)
-   return pos
+        Timer.stop()
 
 
 Timer.timeout.connect(update)
-Timer.start(1000 * dt)
+Timer.start(1000 * r.dt)
