@@ -1,5 +1,10 @@
 # Variables and constants shared across all modules
 
+# model constants
+g = 9.81 # gravity acceleration
+M = 0.4 # quadrotor's mass
+l = 0.2 # length of arm
+
 F = 0.0
 tau_phi = 0.0
 tau_theta = 0.0
