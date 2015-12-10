@@ -1,5 +1,6 @@
 import root as r
 import quad_model
+import DetectMarkers
 from pyqtgraph.Qt import QtGui, QtCore
 import pyqtgraph as pg
 import pyqtgraph.opengl as gl
@@ -35,11 +36,15 @@ def update():
         r.t = r.t + r.dt
         pos = quad_model.AffineTransform(y[1], PosInit)
         scatter.setData(pos=pos[0:3,:].T,color=(1,0,0,.3))
+
+        # Search visual marker on quadrotor
+        MarkerCoord = DetectMarkers.marker_search()
         
         # Feedback control system
         r.F, r.tau_theta, r.tau_phi, r.tau_psi = control.control_loop(y)
     else:
         Timer.stop()
+        DetectMarkers.cap.release()
 
 
 Timer.timeout.connect(update)
