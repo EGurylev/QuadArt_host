@@ -1,3 +1,4 @@
+import root as r
 from scipy import signal
 from scipy import misc
 import matplotlib.pyplot as plt
@@ -42,7 +43,7 @@ def MeanShift(frame, MarkerCoord, Length, AreaPrev):
     return (MarkerCoordUpd, Area[idx])
 
 
-def isLine(p1, p2):
+def isLine(p1, p2, MaxLength, MinLength):
     #construct line with length in specific range
     p1 = p1.astype(float)
     p2 = p2.astype(float)
@@ -137,7 +138,10 @@ def TrackMarker(frameC, MarkerCoord, MeanLength, MeanArea):
     return (MarkerFound, MarkerCoord, MeanLength, MeanArea)
 
 
-def FindMarker(frameC, MarkerFound, MarkerCoord):
+def FindMarker(frameC, MarkerFound, MarkerCoord, MeanArea):
+    dArea, dLength = 15.0, 10.0
+    MinArea, MaxArea = MeanArea - dArea, MeanArea + dArea
+    MinLength, MaxLength = MeanLength - dLength, MeanLength + dLength
     frame = cv2.cvtColor(frameC, cv2.COLOR_BGR2GRAY)
     frame = cv2.adaptiveThreshold(frame,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,13,-3)
     _, contours0, _ = cv2.findContours( frame.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
@@ -167,7 +171,7 @@ def FindMarker(frameC, MarkerFound, MarkerCoord):
             if p1 == p2:
                 continue
             else:
-                L = isLine(ClusterCoord[p1,:],ClusterCoord[p2,:])
+                L = isLine(ClusterCoord[p1,:],ClusterCoord[p2,:], MaxLength, MinLength)
                 if L:
                     Length.append(L)
                     Lines.append(sorted([p1, p2]))
@@ -257,84 +261,26 @@ def FindMarker(frameC, MarkerFound, MarkerCoord):
 
     return (MarkerFound, MarkerCoord)
 
+def marker_search():
+    global MeanArea, dArea, MeanLength, dLength, MarkerCoord, WinScale, cap, MarkerFound
+    ret, frameC = cap.read()
+    
+    if MarkerFound:
+         MarkerFound, MarkerCoord, MeanLength, MeanArea = TrackMarker(frameC, MarkerCoord, MeanLength, MeanArea)   
+    else:
+         MarkerFound, MarkerCoord = FindMarker(frameC, MarkerFound, MarkerCoord, MeanArea)
+        
+    #Draw rectangle for marker reference
+    cv2.rectangle(frameC, (W / 2, H / 2), (W / 2 + int(MeanLength), H / 2 + int(MeanLength)), (0,255,0), 1)
+    
+    return MarkerCoord
 
-#Start
 #Initial settings
 MeanArea = 65.0
-dArea = 15.0
 MeanLength = 80.0
-dLength = 10.0
 MarkerCoord = np.zeros((4,2), dtype=np.int32)
-dXhist0 = []
-MFhist = []
-AcaclHist = []
-XPrev = 0
-YPrev = 0
 WinScale = 1.5 # scale factor for search window
 W, H = 1280, 720
-
-
-#cv windows
-flagCV = 1
-if flagCV:
-    cap = cv2.VideoCapture(0)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, W)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, H)
-    cv2.namedWindow('Debug')
-    MarkerFound = 0
-
-    while(True):
-        ret, frameC = cap.read()
-        nt1 = cv2.getTickCount()
-
-        MinArea, MaxArea = MeanArea - dArea, MeanArea + dArea
-   	MinLength, MaxLength = MeanLength - dLength, MeanLength + dLength
-
-        if MarkerFound:
-            MarkerFound, MarkerCoord, MeanLength, MeanArea = TrackMarker(frameC, MarkerCoord, MeanLength, MeanArea)   
-        else:
-            MarkerFound, MarkerCoord = FindMarker(frameC, MarkerFound, MarkerCoord)
-        
-        
-	
-        #plt.imshow(frameF)
-        tf = cv2.getTickFrequency()
-        nt2 = cv2.getTickCount()
-        fps = cap.get(cv2.CAP_PROP_FPS)
-        dXhist0.append(XPrev - MarkerCoord[0][0])
-        MFhist.append(MarkerFound)
-        
-        XPrev = MarkerCoord[0][0]
-        debugInfo = []
-        debugInfo.append(str(MarkerFound))
-        debugInfo.append(str(tf * 1 / (nt2 - nt1)))
-        debugInfo.append(str(1000 * ((nt2 - nt1) / tf)))
-        debugInfo.append(str(MeanLength))
-        debugInfo.append(str(MeanArea))
-
-        AcaclHist.append(MeanArea)
-
-        #Draw rectangle for marker reference
-        cv2.rectangle(frameC, (W / 2, H / 2), (W / 2 + int(MeanLength), H / 2 + int(MeanLength)), (0,255,0), 1)
-    
-        DebugImg = np.zeros((150,120,3), dtype=np.int8)
-        for t in xrange(len(debugInfo)): 
-            cv2.putText(DebugImg,debugInfo[t],(25,25+15*t), cv2.FONT_HERSHEY_SIMPLEX, 0.4,(255,255,255),1,cv2.LINE_AA)
-        cv2.imshow('Debug',DebugImg)
-        cv2.imshow('frame',frameC)
-        
-        #cv2.imshow('Clusters',frame)
-    
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
-    
-    dXhist0 = np.array(dXhist0)
-    dXhist0[dXhist0 < -100] = 0
-    plt.subplot(2,1,1)
-    plt.plot(MFhist)
-    plt.subplot(2,1,2)
-    plt.plot(AcaclHist)
-
-    
-    cap.release()
-    cv2.destroyAllWindows()
+cap = cv2.VideoCapture(0)
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, W)
+MarkerFound = 0
