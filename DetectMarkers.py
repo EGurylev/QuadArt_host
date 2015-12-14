@@ -13,7 +13,7 @@ def dist(p1, p2):
 
 def MeanShift(frame, MarkerCoord, Length, AreaPrev):
     MarkerCoordUpd = MarkerCoord
-    #Search with fixed number of steps
+    # Search with fixed number of steps
     NumOfMeanShiftSteps = 2
     WindowSize = Length
     for i in xrange(NumOfMeanShiftSteps):
@@ -44,11 +44,11 @@ def MeanShift(frame, MarkerCoord, Length, AreaPrev):
 
 
 def isLine(p1, p2, MaxLength, MinLength):
-    #construct line with length in specific range
+    # Construct line with length in specific range
     p1 = p1.astype(float)
     p2 = p2.astype(float)
    
-    #calculate length of this line
+    # Calculate length of this line
     l = dist(p1, p2)
     if l < MaxLength and l > MinLength:
         return l
@@ -57,13 +57,13 @@ def isLine(p1, p2, MaxLength, MinLength):
 
 
 def isCorner(LengthList, AreaList, CentersList):
-    #test given tuple of lines to be perpendicular to each 
+    # Test given tuple of lines to be perpendicular to each 
     #other and have equal lengths and equal areas of their
     # "points" (blob clusters).
 
     Tol = 0.1#tolerance band
 
-    #are the adjacent lines perpendicular to each other?
+    # Are the adjacent lines perpendicular to each other?
     V1 = [CentersList[1][0]-CentersList[0][0], CentersList[1][1]-CentersList[0][1]]
     V2 = [CentersList[3][0]-CentersList[2][0], CentersList[3][1]-CentersList[2][1]]
     temp = np.dot(V1,V2) / (LengthList[0] * LengthList[1])
@@ -74,10 +74,10 @@ def isCorner(LengthList, AreaList, CentersList):
     alpha = math.acos(temp)
     dA  = abs(math.pi/2 - abs(alpha))
     
-    #Do the lines have equal areas of end "points"
+    # Do the lines have equal areas of end "points"
     dArea = AreaList.std() / AreaList.mean()
 
-    #are the lines have equal length?
+    # Are the lines have equal length?
     dL = abs(LengthList[0] - LengthList[1]) / ((abs(LengthList[0]) + abs(LengthList[1])) / 2)
 
     if (dL < Tol) and (dArea < Tol) and (dA < Tol):
@@ -146,7 +146,7 @@ def FindMarker(frameC, MarkerFound, MarkerCoord, MeanArea):
     frame = cv2.adaptiveThreshold(frame,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,13,-3)
     _, contours0, _ = cv2.findContours( frame.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
         
-    #Choose blob clusters only in specified area region
+    # Choose blob clusters only in specified area region
     Clusters = []
     for k in xrange(len(contours0)):
         if cv2.contourArea(contours0[k]) > MinArea and cv2.contourArea(contours0[k]) < MaxArea:
@@ -156,7 +156,7 @@ def FindMarker(frameC, MarkerFound, MarkerCoord, MeanArea):
     ClusterCoord = np.zeros([Clusters.shape[0], 2])
     cv2.fillPoly(frameC, pts = Clusters, color=(0,0,255))
         
-    #Find clusters' centres
+    # Find clusters' centres
     for i in xrange(Clusters.shape[0]):
                 ClusterCoord[i] = [Clusters[i][:,0][:,0].mean().round(), Clusters[i][:,0][:,1].mean().round()]
 
@@ -165,7 +165,7 @@ def FindMarker(frameC, MarkerFound, MarkerCoord, MeanArea):
     Length = []
     Corners = []
 
-    #Construct line objects
+    # Construct line objects
     for p1 in xrange(ClusterCoord.shape[0]):
         for p2 in xrange(p1 + 1,ClusterCoord.shape[0]):
             if p1 == p2:
@@ -178,7 +178,7 @@ def FindMarker(frameC, MarkerFound, MarkerCoord, MeanArea):
                     frameC = cv2.line(frameC,tuple(ClusterCoord[p1,:]),\
                         tuple(ClusterCoord[p2,:]),(255,0,0),1)
 
-    #Test lines to be perpendicular and equal
+    # Test lines to be perpendicular and equal
     for l1 in xrange(len(Lines)):
         for l2 in xrange(l1 + 1,len(Lines)):
             if (l1 == l2):
@@ -270,10 +270,14 @@ def marker_search():
     else:
          MarkerFound, MarkerCoord = FindMarker(frameC, MarkerFound, MarkerCoord, MeanArea)
         
-    #Draw rectangle for marker reference
+    # Draw rectangle for marker reference
     cv2.rectangle(frameC, (W / 2, H / 2), (W / 2 + int(MeanLength), H / 2 + int(MeanLength)), (0,255,0), 1)
     
-    return MarkerCoord
+    # Reduce frame in order to show within widget
+    RedframeC = cv2.resize(frameC, (W / 2, H / 2))
+    RedframeC = cv2.cvtColor(RedframeC, cv2.COLOR_BGR2RGB)
+    
+    return (MarkerFound, MarkerCoord, RedframeC)
 
 #Initial settings
 MeanArea = 65.0
@@ -283,4 +287,5 @@ WinScale = 1.5 # scale factor for search window
 W, H = 1280, 720
 cap = cv2.VideoCapture(0)
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, W)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, H)
 MarkerFound = 0
