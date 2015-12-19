@@ -10,6 +10,9 @@ import math
 import numpy as np
 from scipy import integrate
 
+def threadDone(frame):
+    imW.setImage(np.rot90(frame))
+
 # Initial values
 PosGi = np.array([0,0,0]) # global position
 VelBi = np.array([0,0,0]) # body linear velocity
@@ -51,20 +54,22 @@ scatter.setData(pos=pos[0:3,:].T,color=(1,0,0,.3))
 view3DW.addItem(scatter)
 Timer = QtCore.QTimer()
 
+# Search visual marker on quadrotor within its own thread
+improc = DetectMarkers.ImageThread()
+mainW.connect(improc, QtCore.SIGNAL("NdArraySig(PyQt_PyObject)"), threadDone, QtCore.Qt.DirectConnection)
+improc.start()
+    
+
 def update():
     global scatter, y, Timer
-    # Search visual marker on quadrotor
-    MarkerFound, MarkerCoord, RedframeC = DetectMarkers.marker_search()
-    # Show processed image from camera
-    imW.setImage(np.rot90(RedframeC))
-    #if MarkerFound:
-        #y = integrate.odeint(quad_model.RHS,y[1],np.array([r.t, r.t + r.dt]))
-        #r.t = r.t + r.dt
-        #pos = quad_model.AffineTransform(y[1], PosInit)
-        #scatter.setData(pos=pos[0:3,:].T,color=(1,0,0,.3))
+
+    y = integrate.odeint(quad_model.RHS,y[1],np.array([r.t, r.t + r.dt]))
+    r.t = r.t + r.dt
+    pos = quad_model.AffineTransform(y[1], PosInit)
+    scatter.setData(pos=pos[0:3,:].T,color=(1,0,0,.3))
         
-        # Feedback control system
-        #r.F, r.tau_theta, r.tau_phi, r.tau_psi = control.control_loop(y)
+    # Feedback control system
+    r.F, r.tau_theta, r.tau_phi, r.tau_psi = control.control_loop(y)
 
 
 Timer.timeout.connect(update)
