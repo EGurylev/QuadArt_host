@@ -118,9 +118,9 @@ class ImageThread(QtCore.QThread):
             else:
                 Lengths[n] = dist(self.MarkerCoord[n], self.MarkerCoord[n + 1])
 
-        self.LengthMean = Lengths.mean()
+        self.MeanLength = Lengths.mean()
         
-        if Lengths.std() / self.LengthMean < 0.1:
+        if Lengths.std() / self.MeanLength < 0.1:
             self.MarkerFound = 1
         else:
             self.MarkerFound = 0
