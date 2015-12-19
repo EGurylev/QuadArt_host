@@ -12,5 +12,5 @@ tau_psi = 0.0
 k1 = 0.981; # coefficient which relates force with command signals
 k2 = 1; # coefficient which relates torque with command signals
 Tend = 5.0
-dt = 0.035
+dt = 0.02
 t = 0
