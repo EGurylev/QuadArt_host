@@ -65,13 +65,13 @@ class ImageThread(QtCore.QThread):
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.W)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.H)
         self.MarkerFound = 0
-        self.NdArraySig = QtCore.pyqtSignal(np.ndarray)
+        self.Sig = QtCore.pyqtSignal(np.ndarray, float)
         
         
     def run(self):
         while True:
             self.update()
-            self.emit(QtCore.SIGNAL("NdArraySig(PyQt_PyObject)"), self.RedframeC)
+            self.emit(QtCore.SIGNAL("Sig(PyQt_PyObject, PyQt_PyObject)"), self.RedframeC, self.MeanLength)
     
     
     def update(self):

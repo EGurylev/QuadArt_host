@@ -8,10 +8,14 @@ from pyqtgraph.widgets.RawImageWidget import RawImageWidget
 import control
 import math
 import numpy as np
+import collections
 from scipy import integrate
 
-def threadDone(frame):
+def threadDone(frame, MeanLength):
     imW.setImage(np.rot90(frame))
+    plot_buffer_y.append(MeanLength)
+    plot_buffer_x.append(r.t)
+    PItem.setData(plot_buffer_x, plot_buffer_y)
 
 # Initial values
 PosGi = np.array([0,0,0]) # global position
@@ -56,8 +60,12 @@ Timer = QtCore.QTimer()
 
 # Search visual marker on quadrotor within its own thread
 improc = DetectMarkers.ImageThread()
-mainW.connect(improc, QtCore.SIGNAL("NdArraySig(PyQt_PyObject)"), threadDone, QtCore.Qt.DirectConnection)
+mainW.connect(improc, QtCore.SIGNAL("Sig(PyQt_PyObject, PyQt_PyObject)"), threadDone, QtCore.Qt.DirectConnection)
 improc.start()
+
+plot_buffer_y = collections.deque(np.zeros(100), maxlen=100)
+plot_buffer_x = collections.deque(np.zeros(100), maxlen=100)
+PItem = plotW.plot(plot_buffer_x, plot_buffer_y)
     
 
 def update():
