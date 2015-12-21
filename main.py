@@ -13,7 +13,8 @@ from scipy import integrate
 
 def threadDone(frame, MeanLength):
     imW.setImage(np.rot90(frame))
-    plot_buffer_y.append(MeanLength)
+    Dist = r.K / MeanLength # distance from camera to marker, cm
+    plot_buffer_y.append(Dist)
     plot_buffer_x.append(r.t)
     PItem.setData(plot_buffer_x, plot_buffer_y)
 
