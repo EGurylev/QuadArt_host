@@ -36,7 +36,7 @@ def RHS(y,t):
     deriv[6] = omega_x + math.sin(phi) * math.tan(theta) * omega_y + math.cos(phi) * math.tan(theta) * omega_z
     deriv[7] = math.cos(phi) * omega_y - math.sin(phi) * omega_z
     deriv[8] = math.sin(phi) / math.cos(theta) * omega_y + math.cos(phi) / math.cos(theta) * omega_z
-    # Body angiular velocities
+    # Body angular velocities
     deriv[9] = (Jyy - Jzz) / Jxx * omega_y * omega_z + r.tau_phi / Jxx
     deriv[10] = (Jzz - Jxx) / Jyy * omega_x * omega_z + r.tau_theta / Jyy
     deriv[11] = (Jxx - Jyy) / Jzz * omega_x * omega_y + r.tau_psi / Jzz

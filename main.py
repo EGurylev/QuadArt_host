@@ -11,9 +11,12 @@ import numpy as np
 import collections
 from scipy import integrate
 
-def threadDone(frame, MeanLength):
+def threadDone(frame, MarkerCenter, MeanLength):
+    global Dist, X, Y
     imW.setImage(np.rot90(frame))
-    Dist = r.K / MeanLength # distance from camera to marker, cm
+    Dist = r.K / MeanLength # distance from camera to marker, m
+    X = r.L * MarkerCenter[0] / MeanLength # x coordinate of a marker, m
+    Y = - r.L * MarkerCenter[1] / MeanLength # y coordinate of a marker, m
     plot_buffer_y.append(Dist)
     plot_buffer_x.append(r.t)
     PItem.setData(plot_buffer_x, plot_buffer_y)
@@ -54,14 +57,17 @@ mainW.showMaximized()
 	
 PosInit = 0.5 * np.array([[-r.l,0,0,r.l,0],[0,r.l,-r.l,0,0],[0,0,0,0,0],[2,2,2,2,2]])
 pos = quad_model.AffineTransform(y[1], PosInit)
-scatter = pg.opengl.GLScatterPlotItem()
-scatter.setData(pos=pos[0:3,:].T,color=(1,0,0,.3))
-view3DW.addItem(scatter)
+model_sc = pg.opengl.GLScatterPlotItem()
+model_sc.setData(pos=pos[0:3,:].T,color=(1,0,0,.3))
+exp_sc = pg.opengl.GLScatterPlotItem()
+exp_sc.setData(pos=pos[0:3,:].T,color=(0,1,0,.3))
+view3DW.addItem(model_sc)
+view3DW.addItem(exp_sc)
 Timer = QtCore.QTimer()
 
 # Search visual marker on quadrotor within its own thread
 improc = DetectMarkers.ImageThread()
-mainW.connect(improc, QtCore.SIGNAL("Sig(PyQt_PyObject, PyQt_PyObject)"), threadDone, QtCore.Qt.DirectConnection)
+mainW.connect(improc, QtCore.SIGNAL("Sig(PyQt_PyObject, PyQt_PyObject, PyQt_PyObject)"), threadDone, QtCore.Qt.DirectConnection)
 improc.start()
 
 plot_buffer_y = collections.deque(np.zeros(100), maxlen=100)
@@ -70,15 +76,19 @@ PItem = plotW.plot(plot_buffer_x, plot_buffer_y)
     
 
 def update():
-    global scatter, y, Timer
-
+    global model_sc, exp_sc, y, Timer, Dist, X, Y
+    ## Simulated
     y = integrate.odeint(quad_model.RHS,y[1],np.array([r.t, r.t + r.dt]))
     r.t = r.t + r.dt
     pos = quad_model.AffineTransform(y[1], PosInit)
-    scatter.setData(pos=pos[0:3,:].T,color=(1,0,0,.3))
-        
+    model_sc.setData(pos=pos[0:3,:].T,color=(1,0,0,.3))     
     # Feedback control system
     r.F, r.tau_theta, r.tau_phi, r.tau_psi = control.control_loop(y)
+    
+    ## Measured
+    y_m = [0, 0, 0, X, Dist, Y, 0, 0, 0]
+    pos = quad_model.AffineTransform(y_m, PosInit)
+    exp_sc.setData(pos=pos[0:3,:].T,color=(0,1,0,.3))
 
 
 Timer.timeout.connect(update)

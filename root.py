@@ -6,7 +6,8 @@ M = 0.4 # quadrotor's mass
 l = 0.2 # length of arm
 
 # marker constants
-K = 8800 # coefficient for Pinhole camera model
+K = 88 # coefficient for Pinhole camera model
+L = 0.08 # size of a marker, m
 
 F = 0.0
 tau_phi = 0.0

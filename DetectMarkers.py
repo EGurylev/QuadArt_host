@@ -59,19 +59,20 @@ class ImageThread(QtCore.QThread):
         self.MeanArea = 65.0
         self.MeanLength = 80.0
         self.MarkerCoord = np.zeros((4,2), dtype=np.int32)
+        self.MarkerCenter = [0, 0]
         self.WinScale = 1.5 # scale factor for search window
         self.W, self.H = 1280, 720
         self.cap = cv2.VideoCapture(0)
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.W)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.H)
         self.MarkerFound = 0
-        self.Sig = QtCore.pyqtSignal(np.ndarray, float)
+        self.Sig = QtCore.pyqtSignal(np.ndarray, list, float)
         
         
     def run(self):
         while True:
             self.update()
-            self.emit(QtCore.SIGNAL("Sig(PyQt_PyObject, PyQt_PyObject)"), self.RedframeC, self.MeanLength)
+            self.emit(QtCore.SIGNAL("Sig(PyQt_PyObject, PyQt_PyObject, PyQt_PyObject)"), self.RedframeC, self.MarkerCenter, self.MeanLength)
     
     
     def update(self):
@@ -127,13 +128,13 @@ class ImageThread(QtCore.QThread):
 
 
     def TrackMarker(self):
-        MarkerCenter = [int(round(np.mean([self.MarkerCoord[0][0], self.MarkerCoord[1][0], self.MarkerCoord[2][0], \
+        self.MarkerCenter = [int(round(np.mean([self.MarkerCoord[0][0], self.MarkerCoord[1][0], self.MarkerCoord[2][0], \
             self.MarkerCoord[3][0]]))), int(round(np.mean([self.MarkerCoord[0][1], self.MarkerCoord[1][1], \
             self.MarkerCoord[2][1], self.MarkerCoord[3][1]])))]
-        X1 = MarkerCenter[0] - int(self.WinScale * self.MeanLength)
-        X2 = MarkerCenter[0] + int(self.WinScale * self.MeanLength)
-        Y1 = MarkerCenter[1] - int(self.WinScale * self.MeanLength)
-        Y2 = MarkerCenter[1] + int(self.WinScale * self.MeanLength)
+        X1 = self.MarkerCenter[0] - int(self.WinScale * self.MeanLength)
+        X2 = self.MarkerCenter[0] + int(self.WinScale * self.MeanLength)
+        Y1 = self.MarkerCenter[1] - int(self.WinScale * self.MeanLength)
+        Y2 = self.MarkerCenter[1] + int(self.WinScale * self.MeanLength)
         MarkerFrame = self.frameC[Y1:Y2, X1:X2]
         cv2.rectangle(self.frameC, (X1, Y1), (X2, Y2), (255,255,255), 1)
         frame = cv2.cvtColor(MarkerFrame, cv2.COLOR_BGR2GRAY)
