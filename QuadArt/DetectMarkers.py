@@ -89,8 +89,11 @@ class ImageThread(QtCore.QThread):
             XWindowRigth = MarkerCoord[1] + WindowSize / 2
             YWindowDown = MarkerCoord[0] - WindowSize / 2
             YWindowUp = MarkerCoord[0] + WindowSize / 2
-            frameW = frame[XWindowLeft:XWindowRigth,YWindowDown:YWindowUp]
-            _, contours, _ = cv2.findContours( frameW.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+            try:
+                frameW = frame[XWindowLeft:XWindowRigth,YWindowDown:YWindowUp]
+                _, contours, _ = cv2.findContours( frameW.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+            except Exception:
+                return np.array([0, 0])
             Area = []
             for cont in contours:
                 Area.append(cv2.contourArea(cont))
@@ -135,6 +138,10 @@ class ImageThread(QtCore.QThread):
         X2 = self.MarkerCenter[0] + int(self.WinScale * self.MeanLength)
         Y1 = self.MarkerCenter[1] - int(self.WinScale * self.MeanLength)
         Y2 = self.MarkerCenter[1] + int(self.WinScale * self.MeanLength)
+        if Y1 < 0:
+            Y1 = 0
+        if X1 < 0:
+            X1 = 0
         MarkerFrame = self.frameC[Y1:Y2, X1:X2]
         cv2.rectangle(self.frameC, (X1, Y1), (X2, Y2), (255,255,255), 1)
         frame = cv2.cvtColor(MarkerFrame, cv2.COLOR_BGR2GRAY)
