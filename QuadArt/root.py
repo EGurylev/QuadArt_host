@@ -17,6 +17,9 @@ PosInit = 0.5 * np.array([[-l,0,0,l,0],[0,l,-l,0,0],[0,0,0,0,0],[2,2,2,2,2]])
 K = 88 # coefficient for Pinhole camera model
 L = 0.08 # size of a marker, m
 
+# Crazyflie config
+link_uri = 'radio://0/80/250K'
+
 F = 0.0
 tau_phi = 0.0
 tau_theta = 0.0

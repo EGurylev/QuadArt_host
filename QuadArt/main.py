@@ -1,6 +1,7 @@
 import root as r
 import quad_model
 import DetectMarkers
+import cf
 from pyqtgraph.Qt import QtGui, QtCore
 import pyqtgraph as pg
 import pyqtgraph.opengl as gl
@@ -46,7 +47,7 @@ class MainUI(QtGui.QWidget):
         self.view3DW.addItem(self.model_sc)
         self.view3DW.addItem(self.exp_sc)
 
-        # Search visual marker on quadrotor within its own thread
+        # Thread for searching visual marker on quadrotor
         self.improc = DetectMarkers.ImageThread()
         self.connect(self.improc, QtCore.SIGNAL("Sig(PyQt_PyObject, PyQt_PyObject, PyQt_PyObject)"), \
             self.im_threadDone, QtCore.Qt.DirectConnection)
@@ -54,6 +55,16 @@ class MainUI(QtGui.QWidget):
         self.Dist = 0
         self.X = 0
         self.Y = 0
+        
+        # Thread for data exchange with crazyflie
+        self.cf_exch = cf.CrazyflieThread()
+        self.connect(self.cf_exch, QtCore.SIGNAL("Sig_cf(PyQt_PyObject, PyQt_PyObject, PyQt_PyObject)"), \
+            self.cf_threadDone, QtCore.Qt.DirectConnection)
+        self.cf_exch.start()
+        self.roll_cf = 0
+        self.pitch_cf = 0
+        self.yaw_cf = 0
+        
 
         self.plot_buffer_y = collections.deque(np.zeros(100), maxlen=100)
         self.plot_buffer_x = collections.deque(np.zeros(100), maxlen=100)
@@ -71,6 +82,12 @@ class MainUI(QtGui.QWidget):
         self.plot_buffer_y.append(self.X)
         self.plot_buffer_x.append(r.t)
         self.PItem.setData(self.plot_buffer_x, self.plot_buffer_y)
+        
+        
+    def cf_threadDone(self, roll, pitch, yaw):
+        self.roll_cf = roll * math.pi / 180.0
+        self.pitch_cf = pitch * math.pi / 180.0
+        self.yaw_cf = yaw * math.pi / 180.0
     
 
     def update(self):
@@ -83,7 +100,7 @@ class MainUI(QtGui.QWidget):
         r.F, r.tau_theta, r.tau_phi, r.tau_psi = control.control_loop(self.y)
         
         ## Measured
-        y_m = [0, 0, 0, self.X, self.Dist, self.Y, 0, 0, 0]
+        y_m = [0, 0, 0, self.X, self.Dist, self.Y, self.roll_cf, self.pitch_cf, self.yaw_cf]
         pos = quad_model.AffineTransform(y_m, r.PosInit)
         self.exp_sc.setData(pos=pos[0:3,:].T,color=(0,1,0,.3))
         
@@ -91,7 +108,10 @@ class MainUI(QtGui.QWidget):
     def closeEvent(self, event):
         self.deleteLater()
         self.Timer.stop()
+        self.cf_exch.terminate()
+        self.cf_exch._cf.close_link()
         self.improc.cap.release()
+        self.improc.terminate()
         
 
 # Start up the main user-interface
