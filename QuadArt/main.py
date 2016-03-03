@@ -49,7 +49,7 @@ class MainUI(QtGui.QWidget):
 
         # Thread for searching visual marker on quadrotor
         self.improc = DetectMarkers.ImageThread()
-        self.connect(self.improc, QtCore.SIGNAL("Sig(PyQt_PyObject, PyQt_PyObject, PyQt_PyObject)"), \
+        self.connect(self.improc, QtCore.SIGNAL("Sig(PyQt_PyObject, PyQt_PyObject)"), \
             self.im_threadDone, QtCore.Qt.DirectConnection)
         self.improc.start()
         self.Dist = 0
@@ -74,12 +74,9 @@ class MainUI(QtGui.QWidget):
         self.Timer.start(1000 * r.dt)
         
 
-    def im_threadDone(self, frame, MarkerCenter, MeanLength):
+    def im_threadDone(self, frame, MarkerSize):
         self.imW.setImage(np.rot90(frame))
-        self.Dist = r.K / MeanLength # distance from camera to marker, m
-        self.X = r.L * MarkerCenter[0] / 80.0 # x coordinate of a marker, m
-        self.Y = - r.L * MarkerCenter[1] / 80.0 # y coordinate of a marker, m
-        self.plot_buffer_y.append(self.X)
+        self.plot_buffer_y.append(MarkerSize)
         self.plot_buffer_x.append(r.t)
         self.PItem.setData(self.plot_buffer_x, self.plot_buffer_y)
         
