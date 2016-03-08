@@ -6,7 +6,6 @@ import numpy as np
 import math
 import cv2
 
-
 class ImageThread(QtCore.QThread):
     def __init__(self, parent=None):
         super(ImageThread, self).__init__(parent)
@@ -19,18 +18,19 @@ class ImageThread(QtCore.QThread):
         self.MarkerCoord = np.array([self.W / 2, self.H / 2], dtype=np.int32)# Center of a marker
         self.CornerCoord = np.zeros([4,2])
         self.WinScale = 1.8 # scale factor for search window
-        
+        self.MarkerFoundPrev = False
+        self.FalseReason = 0
         self.cap = cv2.VideoCapture(0)
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.W)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.H)
         self.MarkerFound = 0
-        self.Sig = QtCore.pyqtSignal(np.ndarray, list, bool)
+        self.Sig = QtCore.pyqtSignal(np.ndarray, list, int)
         
         
     def run(self):
         while True:
             self.update()
-            self.emit(QtCore.SIGNAL("Sig(PyQt_PyObject, PyQt_PyObject)"), self.RedframeC, self.MarkerFound)
+            self.emit(QtCore.SIGNAL("Sig(PyQt_PyObject, PyQt_PyObject)"), self.RedframeC, self.FalseReason)
     
     
     def update(self):
@@ -40,9 +40,10 @@ class ImageThread(QtCore.QThread):
 
     def MeanShift(self, frame, MarkerCoord):
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        DebugFrame = gray
         FrameSize = gray.shape
-        frame = cv2.adaptiveThreshold(gray,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,27,-3)
-        self.DebugFrame = gray
+        blur = cv2.blur(gray,(13,13))
+        frame = cv2.adaptiveThreshold(blur,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,27,-3)
         _, contours, _ = cv2.findContours( frame.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
         Area = []
         Perimeter = []
@@ -69,9 +70,11 @@ class ImageThread(QtCore.QThread):
             if MinDiff > 0.2:
                 MarkerFound = False
                 cv2.putText(self.frameC,str(MarkerFound),(100,620), font, 0.8,(255,255,255),2,cv2.LINE_AA)
+                self.FalseReason = 1
                 return (MarkerFound, np.array([0, 0]))
             else:
                 MarkerFound = True
+                self.FalseReason = 0
             cv2.putText(self.frameC,str(MarkerFound),(100,620), font, 0.8,(255,255,255),2,cv2.LINE_AA)
             C = contours[idx]
             self.AreaPrev = Area[idx]
@@ -92,14 +95,15 @@ class ImageThread(QtCore.QThread):
     def FindCorners(self, X, Y, FrameSize):
         ContIm = np.zeros(FrameSize, np.float32)
         ContIm[Y,X] = 1
-        dst = cv2.cornerHarris(ContIm,13,13,0.1)
-        _, dst = cv2.threshold(dst,0.5 * dst.max(),1,0)
+        dst = cv2.cornerHarris(ContIm,15,15,0.1)
+        _, dst = cv2.threshold(dst,0.4 * dst.max(),1,0)
         dst = np.uint8(dst)
         _, contoursCorn, _ = cv2.findContours( dst.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
         font = cv2.FONT_HERSHEY_SIMPLEX
         cv2.putText(self.frameC,str(len(contoursCorn)),(100,660), font, 0.8,(255,255,255),2,cv2.LINE_AA)
         if len(contoursCorn) != 4:
             MarkerFound = False
+            self.FalseReason = 2
             return MarkerFound
         else:
             MarkerFound = True
@@ -136,6 +140,9 @@ class ImageThread(QtCore.QThread):
         self.MarkerFound, self.MarkerCoord = self.MeanShift(MarkerFrame, self.MarkerCoord)
         self.MarkerCoord += np.array([X1, Y1])
         self.CornerCoord += np.array([X1, Y1])
+        
+        if (self.MarkerFoundPrev) and (not self.MarkerFound) and (self.FalseReason == 2):
+            self.DebugFrame = MarkerFrame.copy()
     
         if self.MarkerFound:
             self.frameC = cv2.circle(self.frameC,tuple(self.MarkerCoord.astype(int)), 6, (255,0,0), -1)
@@ -158,7 +165,7 @@ class ImageThread(QtCore.QThread):
         else:
              self.FindMarker()
         e2 = cv2.getTickCount()
-        time = 1000 * (e2 - e1)/ cv2.getTickFrequency()#ms
+        time = 1000 * (e2 - e1)/ cv2.getTickFrequency()#ms       
         font = cv2.FONT_HERSHEY_SIMPLEX
         cv2.putText(self.frameC,str(time),(100,450), font, 0.8,(255,255,255),2,cv2.LINE_AA)
         x1, y1 = self.W / 2, self.H / 2
@@ -171,3 +178,4 @@ class ImageThread(QtCore.QThread):
         RedframeC = cv2.resize(self.frameC, (self.W / 2, self.H / 2))
         RedframeC = cv2.flip(RedframeC, 1)# Mirror flip
         self.RedframeC = cv2.cvtColor(RedframeC, cv2.COLOR_BGR2RGB)
+        self.MarkerFoundPrev = self.MarkerFound
