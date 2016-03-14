@@ -43,15 +43,19 @@ def RHS(y,t):
     return deriv   
         
 
-def AffineTransform(y, PosInit):
+def AffineTransform(y, PosInit, order):
    Rx = np.array([[1, 0, 0], [0, math.cos(y[6]), -math.sin(y[6])], \
        [0, math.sin(y[6]), math.cos(y[6])]])
    Ry = np.array([[math.cos(y[7]), 0, math.sin(y[7])], [0, 1, 0],  \
        [-math.sin(y[7]), 0, math.cos(y[7])]])
    Rz = np.array([[math.cos(y[8]), -math.sin(y[8]), 0],  \
        [math.sin(y[8]), math.cos(y[8]), 0], [0, 0, 1]])
-   R = np.dot(Rx,Ry)
-   R = np.dot(R,Rz)
+   if order == 'XYZ':
+       R = np.dot(Rx,Ry)
+       R = np.dot(R,Rz)
+   elif order == 'ZYX':
+       R = np.dot(Rz,Ry)
+       R = np.dot(R,Rx)
    P = y[3:6]
    T1 = np.concatenate((R.T, [P]),axis=0)
    T1 = np.concatenate((T1.T, [np.array([0, 0, 0, 1])]),axis=0)

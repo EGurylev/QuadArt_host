@@ -38,13 +38,18 @@ class MainUI(QtGui.QWidget):
         self.layout.addWidget(self.imW, 1, 1)  # plot goes on bottom-right
         self.grid = gl.GLGridItem()# grid on 3D widget
         self.view3DW.addItem(self.grid)
-        
-        self.pos = quad_model.AffineTransform(self.y[1], r.PosInit)
+        self.Axes = gl.GLLinePlotItem(pos=r.AxesPos, mode='lines', color=r.AxesColor, width=4.0)
+        self.view3DW.addItem(self.Axes)
+        self.pos = quad_model.AffineTransform(self.y[1], r.PosInit, 'XYZ')
         self.model_sc = pg.opengl.GLScatterPlotItem()
+        self.marker_model = gl.GLMeshItem(vertexes=r.verts, faces=r.faces, faceColors=r.colors, smooth=False)
+        self.marker_model.setGLOptions('additive')
         self.model_sc.setData(pos=self.pos[0:3,:].T,color=(1,0,0,.3))
         self.exp_sc = pg.opengl.GLScatterPlotItem()
-        self.exp_sc.setData(pos=self.pos[0:3,:].T,color=(0,1,0,.3))
+        Color = np.array([[0,1,0,.3], [0,0,1,.3], [0,1,0,.3], [0,1,0,.3]])
+        self.exp_sc.setData(pos=self.pos[0:3,:].T,color=Color)
         self.view3DW.addItem(self.model_sc)
+        self.view3DW.addItem(self.marker_model)
         self.view3DW.addItem(self.exp_sc)
 
         # Thread for searching visual marker on quadrotor
@@ -91,15 +96,18 @@ class MainUI(QtGui.QWidget):
         ## Simulated
         self.y = integrate.odeint(quad_model.RHS,self.y[1],np.array([r.t, r.t + r.dt]))
         r.t = r.t + r.dt
-        pos = quad_model.AffineTransform(self.y[1], r.PosInit)
+        pos = quad_model.AffineTransform(self.y[1], r.PosInit, 'XYZ')
         self.model_sc.setData(pos=pos[0:3,:].T,color=(1,0,0,.3))     
         # Feedback control system
         r.F, r.tau_theta, r.tau_phi, r.tau_psi = control.control_loop(self.y)
         
         ## Measured
-        y_m = [0, 0, 0, self.X, self.Dist, self.Y, self.roll_cf, self.pitch_cf, self.yaw_cf]
-        pos = quad_model.AffineTransform(y_m, r.PosInit)
-        self.exp_sc.setData(pos=pos[0:3,:].T,color=(0,1,0,.3))
+        y_m = [0, 0, 0, self.X, self.Dist, self.Y, self.roll_cf, -self.pitch_cf, self.yaw_cf]
+        pos = quad_model.AffineTransform(y_m, r.PosInit, 'ZYX')
+        initv = np.vstack([r.verts.T, np.ones(8)])
+        posv = quad_model.AffineTransform(y_m, initv, 'ZYX')
+        self.exp_sc.setData(pos=pos[0:3,:].T)
+        self.marker_model.setMeshData(vertexes=posv[0:3,:].T, faces=r.faces, faceColors=r.colors, smooth=False)
         
         
     def closeEvent(self, event):

@@ -13,9 +13,39 @@ AnglesGi = np.array([0,0,0]) # global angles (Euler)
 OmegaBi = np.array([0,0,0]) # body angular velocity
 PosInit = 0.5 * np.array([[-l,0,0,l,0],[0,l,-l,0,0],[0,0,0,0,0],[2,2,2,2,2]])
 
-# marker constants
-K = 88 # coefficient for Pinhole camera model
-L = 0.08 # size of a marker, m
+# marker geometry, cm
+l1 = 6.0
+l2 = 3.0
+
+verts = np.array([
+    [-l1/2, 0, -l1/2],
+    [l1/2, 0, -l1/2],
+    [-l1/2, 0, l1/2],
+    [l1/2, 0, l1/2],
+   [-l2/2, 0, -l2/2],
+    [l2/2, 0, -l2/2],
+    [-l2/2, 0, l2/2],
+    [l2/2, 0, l2/2]
+])
+
+faces = np.array([
+    [0, 1, 2],
+    [3, 1, 2],
+    [4, 5, 6],
+    [7, 5, 6]
+])
+colors = np.array([
+    [1, 1, 1, 0.2],
+    [1, 1, 1, 0.2],
+    [1, 1, 1, 0.5],
+    [1, 1, 1, 0.5]
+])
+
+# Axes in 3D
+AxesPos = np.array([[0, 0, 0], [1, 0, 0], [0, 0, 0],\
+    [0, 1, 0], [0, 0, 0], [0, 0, 1]])
+AxesColor = np.array([[0, 0, 1, 0.9], [0, 0, 1, 0.9],\
+    [0, 1, 0, 0.9], [0, 1, 0, 0.9], [1, 0, 0, 0.9], [1, 0, 0, 0.9]])
 
 # Crazyflie config
 link_uri = 'radio://0/80/250K'

@@ -17,20 +17,20 @@ class ImageThread(QtCore.QThread):
         self.AreaPrev = self.MarkerSize * self.MarkerSize
         self.MarkerCoord = np.array([self.W / 2, self.H / 2], dtype=np.int32)# Center of a marker
         self.CornerCoord = np.zeros([4,2])
-        self.WinScale = 1.8 # scale factor for search window
+        self.WinScale = 2 # scale factor for search window
         self.MarkerFoundPrev = False
         self.FalseReason = 0
         self.cap = cv2.VideoCapture(0)
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.W)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.H)
         self.MarkerFound = 0
-        self.Sig = QtCore.pyqtSignal(np.ndarray, list, int)
+        self.Sig = QtCore.pyqtSignal(np.ndarray, list, float)
         
         
     def run(self):
         while True:
             self.update()
-            self.emit(QtCore.SIGNAL("Sig(PyQt_PyObject, PyQt_PyObject)"), self.RedframeC, self.FalseReason)
+            self.emit(QtCore.SIGNAL("Sig(PyQt_PyObject, PyQt_PyObject)"), self.RedframeC, self.MarkerSize)
     
     
     def update(self):
