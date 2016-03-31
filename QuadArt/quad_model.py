@@ -44,18 +44,7 @@ def RHS(y,t):
         
 
 def AffineTransform(y, PosInit, order):
-   Rx = np.array([[1, 0, 0], [0, math.cos(y[6]), -math.sin(y[6])], \
-       [0, math.sin(y[6]), math.cos(y[6])]])
-   Ry = np.array([[math.cos(y[7]), 0, math.sin(y[7])], [0, 1, 0],  \
-       [-math.sin(y[7]), 0, math.cos(y[7])]])
-   Rz = np.array([[math.cos(y[8]), -math.sin(y[8]), 0],  \
-       [math.sin(y[8]), math.cos(y[8]), 0], [0, 0, 1]])
-   if order == 'XYZ':
-       R = np.dot(Rx,Ry)
-       R = np.dot(R,Rz)
-   elif order == 'ZYX':
-       R = np.dot(Rz,Ry)
-       R = np.dot(R,Rx)
+   R = r.Euler2Mat(y[6], y[7], y[8], order)
    P = y[3:6]
    T1 = np.concatenate((R.T, [P]),axis=0)
    T1 = np.concatenate((T1.T, [np.array([0, 0, 0, 1])]),axis=0)

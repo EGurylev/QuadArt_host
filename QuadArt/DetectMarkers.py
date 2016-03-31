@@ -10,27 +10,24 @@ class ImageThread(QtCore.QThread):
     def __init__(self, parent=None):
         super(ImageThread, self).__init__(parent)
         #Initial settings
-        self.W, self.H = 1280, 720
         self.PerimeterPrev = 400
-        self.DebugFrame = []
         self.MarkerSize = self.PerimeterPrev / 4
         self.AreaPrev = self.MarkerSize * self.MarkerSize
-        self.MarkerCoord = np.array([self.W / 2, self.H / 2], dtype=np.int32)# Center of a marker
-        self.CornerCoord = np.zeros([4,2])
+        self.MarkerCoord = np.array([r.W / 2, r.H / 2], dtype=np.int32)# Center of a marker
         self.WinScale = 2 # scale factor for search window
         self.MarkerFoundPrev = False
-        self.FalseReason = 0
         self.cap = cv2.VideoCapture(0)
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.W)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.H)
-        self.MarkerFound = 0
-        self.Sig = QtCore.pyqtSignal(np.ndarray, list, float)
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, r.W)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, r.H)
+        self.MarkerFound = False
+        self.Sig = QtCore.pyqtSignal(np.ndarray, bool, float)
         
         
     def run(self):
         while True:
             self.update()
-            self.emit(QtCore.SIGNAL("Sig(PyQt_PyObject, PyQt_PyObject)"), self.RedframeC, self.MarkerSize)
+            self.emit(QtCore.SIGNAL("Sig(PyQt_PyObject, PyQt_PyObject, PyQt_PyObject)"),\
+                self.RedframeC, self.MarkerFound, r.tvec[2][0])
     
     
     def update(self):
@@ -40,7 +37,6 @@ class ImageThread(QtCore.QThread):
 
     def MeanShift(self, frame, MarkerCoord):
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        DebugFrame = gray
         FrameSize = gray.shape
         blur = cv2.blur(gray,(13,13))
         frame = cv2.adaptiveThreshold(blur,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,27,-3)
@@ -70,11 +66,9 @@ class ImageThread(QtCore.QThread):
             if MinDiff > 0.2:
                 MarkerFound = False
                 cv2.putText(self.frameC,str(MarkerFound),(100,620), font, 0.8,(255,255,255),2,cv2.LINE_AA)
-                self.FalseReason = 1
                 return (MarkerFound, np.array([0, 0]))
             else:
                 MarkerFound = True
-                self.FalseReason = 0
             cv2.putText(self.frameC,str(MarkerFound),(100,620), font, 0.8,(255,255,255),2,cv2.LINE_AA)
             C = contours[idx]
             self.AreaPrev = Area[idx]
@@ -93,6 +87,7 @@ class ImageThread(QtCore.QThread):
         
       
     def FindCorners(self, X, Y, FrameSize):
+        CornerCoordTemp = np.zeros((4, 2))
         ContIm = np.zeros(FrameSize, np.float32)
         ContIm[Y,X] = 1
         dst = cv2.cornerHarris(ContIm,15,15,0.1)
@@ -103,7 +98,6 @@ class ImageThread(QtCore.QThread):
         cv2.putText(self.frameC,str(len(contoursCorn)),(100,660), font, 0.8,(255,255,255),2,cv2.LINE_AA)
         if len(contoursCorn) != 4:
             MarkerFound = False
-            self.FalseReason = 2
             return MarkerFound
         else:
             MarkerFound = True
@@ -114,7 +108,16 @@ class ImageThread(QtCore.QThread):
             C = C.reshape(N * 2, 1)
             Y = np.array(C[1::2])
             X = np.array(C[0::2])           
-            self.CornerCoord[i][:] = np.array([int(X.mean()), int(Y.mean())])
+            CornerCoordTemp[i][:] = np.array([int(X.mean()), int(Y.mean())])
+            # Reorder corner points for pose estimation algorithm
+            if CornerCoordTemp[i][0] < FrameSize[0] / 2 and CornerCoordTemp[i][1] < FrameSize[0] / 2:
+                r.CornerCoord[0][:] = CornerCoordTemp[i][:]
+            elif CornerCoordTemp[i][0] > FrameSize[0] / 2 and CornerCoordTemp[i][1] < FrameSize[0] / 2:
+                r.CornerCoord[1][:] = CornerCoordTemp[i][:]
+            elif CornerCoordTemp[i][0] < FrameSize[0] / 2 and CornerCoordTemp[i][1] > FrameSize[0] / 2:
+                r.CornerCoord[2][:] = CornerCoordTemp[i][:]
+            elif CornerCoordTemp[i][0] > FrameSize[0] / 2 and CornerCoordTemp[i][1] > FrameSize[0] / 2:
+                r.CornerCoord[3][:] = CornerCoordTemp[i][:]
             i += 1
         return MarkerFound    
         
@@ -130,23 +133,20 @@ class ImageThread(QtCore.QThread):
             Y1 = 0
         if X1 < 0:
             X1 = 0
-        if X2 > self.W:
-            X2 = self.W
-        if Y2 > self.H:
-            Y2 = self.H
+        if X2 > r.W:
+            X2 = r.W
+        if Y2 > r.H:
+            Y2 = r.H
         MarkerFrame = self.frameC[Y1:Y2, X1:X2]
                
         self.MarkerCoord -= np.array([X1, Y1])
         self.MarkerFound, self.MarkerCoord = self.MeanShift(MarkerFrame, self.MarkerCoord)
         self.MarkerCoord += np.array([X1, Y1])
-        self.CornerCoord += np.array([X1, Y1])
-        
-        if (self.MarkerFoundPrev) and (not self.MarkerFound) and (self.FalseReason == 2):
-            self.DebugFrame = MarkerFrame.copy()
+        r.CornerCoord += np.array([X1, Y1])
     
         if self.MarkerFound:
             self.frameC = cv2.circle(self.frameC,tuple(self.MarkerCoord.astype(int)), 6, (255,0,0), -1)
-            for corn in self.CornerCoord:
+            for corn in r.CornerCoord:
                 self.frameC = cv2.circle(self.frameC,tuple(corn.astype(int)), 5, (0,255,0), -1)
             # Draw rectangle for marker reference
             cv2.rectangle(self.frameC, (X1, Y1), (X2, Y2), (0,255,0), 1)
@@ -158,24 +158,20 @@ class ImageThread(QtCore.QThread):
 
     def marker_search(self):
         ret, self.frameC = self.cap.read()
-        e1 = cv2.getTickCount()
             
         if self.MarkerFound:
              self.TrackMarker()
         else:
-             self.FindMarker()
-        e2 = cv2.getTickCount()
-        time = 1000 * (e2 - e1)/ cv2.getTickFrequency()#ms       
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        cv2.putText(self.frameC,str(time),(100,450), font, 0.8,(255,255,255),2,cv2.LINE_AA)
-        x1, y1 = self.W / 2, self.H / 2
+             self.FindMarker()        
+        
+        x1, y1 = r.W / 2, r.H / 2
         x2 = x1 + int(self.MarkerSize)        
         y2 = y1 + int(self.MarkerSize)
         # Draw rectangle for marker search window
         cv2.rectangle(self.frameC, (x1, y1), (x2, y2), (0,255,0), 1)
         
         # Reduce frame in order to show within widget
-        RedframeC = cv2.resize(self.frameC, (self.W / 2, self.H / 2))
+        RedframeC = cv2.resize(self.frameC, (r.W / 2, r.H / 2))
         RedframeC = cv2.flip(RedframeC, 1)# Mirror flip
         self.RedframeC = cv2.cvtColor(RedframeC, cv2.COLOR_BGR2RGB)
         self.MarkerFoundPrev = self.MarkerFound

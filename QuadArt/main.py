@@ -1,6 +1,7 @@
 import root as r
 import quad_model
 import DetectMarkers
+import pose_estim
 import cf
 from pyqtgraph.Qt import QtGui, QtCore
 import pyqtgraph as pg
@@ -54,21 +55,21 @@ class MainUI(QtGui.QWidget):
 
         # Thread for searching visual marker on quadrotor
         self.improc = DetectMarkers.ImageThread()
-        self.connect(self.improc, QtCore.SIGNAL("Sig(PyQt_PyObject, PyQt_PyObject)"), \
+        self.connect(self.improc, QtCore.SIGNAL("Sig(PyQt_PyObject, PyQt_PyObject, PyQt_PyObject)"), \
             self.im_threadDone, QtCore.Qt.DirectConnection)
         self.improc.start()
         self.Dist = 0
-        self.X = 0
-        self.Y = 0
+        #self.X = 0
+        #self.Y = 0
         
         # Thread for data exchange with crazyflie
         self.cf_exch = cf.CrazyflieThread()
         self.connect(self.cf_exch, QtCore.SIGNAL("Sig_cf(PyQt_PyObject, PyQt_PyObject, PyQt_PyObject)"), \
             self.cf_threadDone, QtCore.Qt.DirectConnection)
         self.cf_exch.start()
-        self.roll_cf = 0
-        self.pitch_cf = 0
-        self.yaw_cf = 0
+        r.roll_cf = 0
+        r.pitch_cf = 0
+        r.yaw_cf = 0
         
 
         self.plot_buffer_y = collections.deque(np.zeros(100), maxlen=100)
@@ -79,17 +80,19 @@ class MainUI(QtGui.QWidget):
         self.Timer.start(1000 * r.dt)
         
 
-    def im_threadDone(self, frame, MarkerSize):
+    def im_threadDone(self, frame, MarkerFound, debug_plot):
+        if MarkerFound:
+            pose_estim.calc_pose()
         self.imW.setImage(np.rot90(frame))
-        self.plot_buffer_y.append(MarkerSize)
+        self.plot_buffer_y.append(r.pitch_e)
         self.plot_buffer_x.append(r.t)
         self.PItem.setData(self.plot_buffer_x, self.plot_buffer_y)
         
         
     def cf_threadDone(self, roll, pitch, yaw):
-        self.roll_cf = roll * math.pi / 180.0
-        self.pitch_cf = pitch * math.pi / 180.0
-        self.yaw_cf = yaw * math.pi / 180.0
+        r.roll_cf = roll * math.pi / 180.0
+        r.pitch_cf = pitch * math.pi / 180.0
+        r.yaw_cf = yaw * math.pi / 180.0
     
 
     def update(self):
@@ -102,7 +105,8 @@ class MainUI(QtGui.QWidget):
         r.F, r.tau_theta, r.tau_phi, r.tau_psi = control.control_loop(self.y)
         
         ## Measured
-        y_m = [0, 0, 0, self.X, self.Dist, self.Y, self.roll_cf, -self.pitch_cf, self.yaw_cf]
+        y_m = [0, 0, 0, r.tvec[0][0], r.tvec[2][0], -r.tvec[1][0], r.roll_cf, -r.pitch_cf, r.yaw_cf]
+        #y_m = [0, 0, 0, r.tvec[0][0], r.tvec[2][0], -r.tvec[1][0], r.rvec[0][0], r.rvec[2][0], r.rvec[1][0]]
         pos = quad_model.AffineTransform(y_m, r.PosInit, 'ZYX')
         initv = np.vstack([r.verts.T, np.ones(8)])
         posv = quad_model.AffineTransform(y_m, initv, 'ZYX')
