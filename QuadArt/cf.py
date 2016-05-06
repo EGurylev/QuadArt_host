@@ -3,11 +3,12 @@ from pyqtgraph.Qt import QtCore
 import cflib.crtp
 from cflib.crazyflie import Crazyflie
 from cfclient.utils.logconfigreader import LogConfig
+from threading import Thread
 import time
 
-class CrazyflieThread(QtCore.QThread):
+class crazyflie_thread(QtCore.QThread):
     def __init__(self, parent=None):
-        super(CrazyflieThread, self).__init__(parent)
+        super(crazyflie_thread, self).__init__(parent)
         # Initialize the low-level drivers for crazyflie
         cflib.crtp.init_drivers(enable_debug_driver=False)
         # Create a Crazyflie object
@@ -18,7 +19,8 @@ class CrazyflieThread(QtCore.QThread):
         self._cf.connection_failed.add_callback(self._connection_failed)
         self._cf.connection_lost.add_callback(self._connection_lost)
         self.roll = self.pitch = self.yaw = 0
-        self.Sig_cf = QtCore.pyqtSignal(float, float, float)
+        self.thrust = 0
+        self.Sig_cf = QtCore.pyqtSignal(float, float, float, int)
         
         
     def run(self):
@@ -26,7 +28,41 @@ class CrazyflieThread(QtCore.QThread):
         self._cf.open_link(r.link_uri)
         while True:
             time.sleep(r.dt)
-            self.emit(QtCore.SIGNAL("Sig_cf(PyQt_PyObject, PyQt_PyObject, PyQt_PyObject)"), self.roll, self.pitch, self.yaw)
+            self.emit(QtCore.SIGNAL("Sig_cf(PyQt_PyObject, PyQt_PyObject, PyQt_PyObject, PyQt_PyObject)"), self.roll, self.pitch, self.yaw, self.thrust)
+            
+    def _do_control(self):
+        # Thrust control
+        # Unlock startup thrust protection
+        self._cf.commander.send_setpoint(0, 0, 0, 0)
+        thrust_min = 35000
+        thrust_max = 50000
+        
+        thrust = 0
+        pitch = 0
+        roll = 0
+        yawrate = 0
+        while r.t < 20:
+            if r.marker_found:
+                thrust = r.thrust_set
+                thrust += r.thrust_eq
+                if thrust > thrust_max:
+                    thrust = thrust_max
+                if thrust < thrust_min:
+                    thrust = thrust_min
+                    
+                pitch = r.pitch_set
+                roll = r.roll_set
+                
+            elif thrust > 0:
+                thrust -= 100
+                pitch = 0
+            self._cf.commander.send_setpoint(roll, pitch, yawrate, thrust)
+            time.sleep(1/30.0)
+            
+        while thrust > 0:
+            thrust -= 100
+            time.sleep(1/30.0)
+        self._cf.commander.send_setpoint(0, 0, 0, 0)
             
             
     def _connected(self, link_uri):
@@ -39,7 +75,10 @@ class CrazyflieThread(QtCore.QThread):
         self._lg_stab.add_variable("stabilizer.roll", "float")
         self._lg_stab.add_variable("stabilizer.pitch", "float")
         self._lg_stab.add_variable("stabilizer.yaw", "float")
-
+        self._lg_stab.add_variable("stabilizer.thrust", "uint16_t")
+        # Start control loop thread
+        Thread(target=self._do_control).start()
+        
         # Adding the configuration cannot be done until a Crazyflie is
         # connected, since we need to check that the variables we
         # would like to log are in the TOC.
@@ -66,6 +105,7 @@ class CrazyflieThread(QtCore.QThread):
         self.roll = data['stabilizer.roll']
         self.pitch = data['stabilizer.pitch']
         self.yaw = data['stabilizer.yaw']
+        self.thrust = data['stabilizer.thrust']
 
     def _connection_failed(self, link_uri, msg):
         """Callback when connection initial connection fails (i.e no Crazyflie
@@ -81,4 +121,5 @@ class CrazyflieThread(QtCore.QThread):
     def _disconnected(self, link_uri):
         """Callback when the Crazyflie is disconnected (called in all cases)"""
         print "Disconnected from %s" % link_uri
+        self._cf.commander.send_setpoint(0, 0, 0, 0)
         self.is_connected = False

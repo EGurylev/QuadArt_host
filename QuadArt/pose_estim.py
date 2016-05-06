@@ -1,37 +1,38 @@
 import root as r
 import numpy as np
 import cv2
+import math
 
 def calc_pose():
     # Calc. pose using solvePnP function
-    R = r.Euler2Mat(r.roll_cf, r.yaw_cf, r.pitch_cf, 'ZYX')
-    rvec_init, _ = cv2.Rodrigues(R)
-    retval, r.rvec, r.tvec = cv2.solvePnP(r.objectPoints, r.CornerCoord, \
-        r.cameraMatrix, r.distCoeffs, rvec_init, r.tvec_Prev, 1)
+    rot_mat = r.euler2mat(r.roll_cf, r.yaw_cf, r.pitch_cf, 'ZYX')
+    rvec_init, _ = cv2.Rodrigues(rot_mat)
+    retval, r.rvec, r.tvec = cv2.solvePnP(r.object_points, r.corner_coord, \
+        r.camera_matrix, r.dist_coeffs, rvec_init, r.tvec_prev, 1)
 
     # Calc. the difference between model and measurements
-    rotM, _ = cv2.Rodrigues(r.rvec)
-    M = np.concatenate((rotM, r.tvec), axis=1)
-    projM = np.dot(r.cameraMatrix, M)
-    imagePoints, _ = cv2.projectPoints(r.objectPoints, r.rvec, r.tvec, \
-        r.cameraMatrix, r.distCoeffs)
-    projPoints = imagePoints.squeeze()
+    rot_mat, _ = cv2.Rodrigues(r.rvec)
+    homog_mat = np.concatenate((rot_mat, r.tvec), axis=1)
+    proj_mat = np.dot(r.camera_matrix, homog_mat)
+    image_points, _ = cv2.projectPoints(r.object_points, r.rvec, r.tvec, \
+        r.camera_matrix, r.dist_coeffs)
+    proj_points = image_points.squeeze()
 
     # This difference is used for restarting estimation from 
     # known initial conditions when "bad" estimations occur
-    CoordDiff = np.linalg.norm(projPoints - r.CornerCoord)
+    coord_diff = np.linalg.norm(proj_points - r.corner_coord)
                 
-    if CoordDiff > 10:
-        r.tvec_Prev = np.zeros([3,1])
-        r.tvec_Prev[2] = 5.0
+    if coord_diff > 10:
+        r.tvec_prev = np.zeros([3,1])
+        r.tvec_prev[2] = 5.0
         r.rvec = np.zeros([3,1])
     else:
-        r.tvec_Prev = r.tvec
+        r.tvec_prev = r.tvec
         
     # Estimated Euler angles
-    _,_,_,rX,rY,rZ,EulerAngles = cv2.decomposeProjectionMatrix(projM)
-    if EulerAngles.shape[1] == 1:
-        EulerAngles = EulerAngles.squeeze()     
-    r.roll_e = EulerAngles[0]
-    r.pitch_e = EulerAngles[1]
-    r.yaw_e = EulerAngles[2]
+    _,_,_,rx,ry,rz,euler_angles = cv2.decomposeProjectionMatrix(proj_mat)
+    if euler_angles.shape[1] == 1:
+        euler_angles = euler_angles.squeeze()     
+    r.roll_e = euler_angles[0]
+    r.pitch_e = euler_angles[1]
+    r.yaw_e = euler_angles[2]
