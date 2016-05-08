@@ -7,7 +7,7 @@ from pyqtgraph.Qt import QtGui, QtCore
 import pyqtgraph as pg
 import pyqtgraph.opengl as gl
 from pyqtgraph.widgets.RawImageWidget import RawImageWidget
-import control
+import feedback_control
 import math
 import numpy as np
 import collections
@@ -117,7 +117,7 @@ class main_ui(QtGui.QWidget):
         pos = quad_model.homog_transform(self.y[1], r.pos_init, 'XYZ')
         self.model_sc.setData(pos=pos[0:3,:].T,color=(1,0,0,.3))     
         # Feedback control system
-        r.force, r.tau_theta, r.tau_phi, r.tau_psi = control.control_loop(self.y)
+        r.force, r.tau_theta, r.tau_phi, r.tau_psi = feedback_control.control_loop(self.y)
         
         ## Measured
         y_m = [0, 0, 0, r.tvec[0][0], r.tvec[2][0], -r.tvec[1][0], r.roll_cf, -r.pitch_cf, r.yaw_cf]
@@ -131,9 +131,9 @@ class main_ui(QtGui.QWidget):
         ## CF control
         ## Pose control of CF
         if abs(r.tvec[1][0]) < 150:# todo: reconsider this condition
-            r.thrust_set = control.z_controller_cf.evaluate(-r.tvec[1][0])
-            r.pitch_set = control.x_controller_cf.evaluate(r.tvec[0][0])
-            r.roll_set = -control.y_controller_cf.evaluate(r.tvec[2][0])
+            r.thrust_set = feedback_control.z_controller_cf.evaluate(-r.tvec[1][0])
+            r.pitch_set = feedback_control.x_controller_cf.evaluate(r.tvec[0][0])
+            r.roll_set = -feedback_control.y_controller_cf.evaluate(r.tvec[2][0])
         
         ## Log data
         self.log['time'].append(r.t)
