@@ -3,6 +3,7 @@ import control.matlab as ml
 import matplotlib.pyplot as plt
 import sympy as sp
 import numpy as np
+from my_functions import *
 
 # Quadrotor model in sympy
 x, y, z = sp.symbols('x, y, z', real=True)
