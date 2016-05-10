@@ -42,19 +42,19 @@ corner_coord = np.zeros([4,2])
 
 # Model parameters
 g = 9.81 # gravity acceleration
-mass = 0.4 # quadrotor's mass
+mass = 0.029 # quadrotor's mass + mass of a marker
 l = 0.2 # length of arm
 force = 0.0 # Force
-j_xx = mass * math.pow(l,2); # moment of inertia according to x axis
-j_yy = mass * math.pow(l,2); # moment of inertia according to y axis
-j_zz = 2 * mass * math.pow(l,2); # moment of inertia according to z axis
+j_xx = 2.3951e-5 # moment of inertia according to x axis
+j_yy = 2.3951e-5 # moment of inertia according to y axis
+j_zz = 3.2347e-5 # moment of inertia according to z axis
 # torques
 tau_phi = 0.0
 tau_theta = 0.0
 tau_psi = 0.0
 
-k1 = 0.981; # coefficient which relates force with command signals
-k2 = 1; # coefficient which relates torque with command signals
+k1 = 0.005022; # coefficient which relates force with command signals
+k2 = 1.858e-5; # coefficient which relates torque with command signals
 dt = 0.02
 t = 0
 

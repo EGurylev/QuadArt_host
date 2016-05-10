@@ -28,18 +28,18 @@ class pid:
         return out
 
 # Controller initialization (simulator)
-z_controller = pid(0.5,0,0.5,1,r.dt)
-z_controller.setpoint = 0.0
-psi_controller = pid(0.5,0,0.5,1,r.dt)
+z_controller = pid(0.02,0,0.02,1,r.dt)
+z_controller.setpoint = 1.0
+psi_controller = pid(5e-4,0,3e-4,1,r.dt)
 psi_controller.setpoint = 0
 
-x_controller = pid(0.2,0,0.1,1,r.dt)
-x_controller.setpoint = -1
-theta_controller = pid(0.1,0,0.1,1,r.dt)
+x_controller = pid(0.08,0,0.06,1,r.dt)
+x_controller.setpoint = 1.0
+theta_controller = pid(5e-4,0,3e-4,1,r.dt)
 
-y_controller = pid(0.2,0,0.1,1,r.dt)
-y_controller.setpoint = 2.6
-phi_controller = pid(0.1,0,0.1,1,r.dt)
+y_controller = pid(0.08,0,0.06,1,r.dt)
+y_controller.setpoint = 2.0
+phi_controller = pid(5e-4,0,3e-4,1,r.dt)
 
 # Controller initialization (real quad)
 z_controller_cf = pid(80,30,90,0.35,1/30.0, upper=7000, lower=-7000, sat_flag=True)
