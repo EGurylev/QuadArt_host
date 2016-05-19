@@ -6,16 +6,9 @@ import numpy as np
 from my_functions import *
 
 
-# Lookup tables for thrust
-pwm_table = 650 * np.array([0,6.25,12.5,18.75,25,31.25,37.5,43.25,50,56.25,
-    62.5,68.75,75,81.25,87.5,93.75]) # in cf's thrust control range
-rpm_table = np.array([0,4485,7570,9374,10885,12277,13522,14691,15924,17174,
-    18179,19397,20539,21692,22598,23882]) # revolutions per minute
-thrust_table = np.array([0,1.6,4.8,7.9,10.9,13.9,17.3,21.0,24.4,28.6,32.8,
-    37.3,41.7,46.0,51.9,57.9]) / 1e3 # kg
 # Calc. rpm and pwm output for equilibrium point   
-rpm_eq = np.interp(r.mass, thrust_table, rpm_table)
-pwm_eq = np.interp(rpm_eq, rpm_table, pwm_table)
+rpm_eq = np.interp(r.mass, r.thrust_table, r.rpm_table)
+pwm_eq = np.interp(rpm_eq, r.rpm_table, r.pwm_table)
 
 # Quadrotor model in sympy
 x, y, z = sp.symbols('x, y, z', real=True)
