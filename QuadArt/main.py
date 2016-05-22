@@ -8,11 +8,11 @@ import pyqtgraph as pg
 import pyqtgraph.opengl as gl
 from pyqtgraph.widgets.RawImageWidget import RawImageWidget
 import feedback_control
-import math
 import numpy as np
 import collections
 from scipy import integrate
 import sys
+import cv2
 
 class main_ui(QtGui.QWidget):
 
@@ -104,9 +104,9 @@ class main_ui(QtGui.QWidget):
         
         
     def cf_thread_done(self, roll, pitch, yaw, thrust):
-        r.roll_cf = roll * math.pi / 180.0
-        r.pitch_cf = pitch * math.pi / 180.0
-        r.yaw_cf = yaw * math.pi / 180.0
+        r.roll_cf = np.deg2rad(roll)
+        r.pitch_cf = np.deg2rad(pitch)
+        r.yaw_cf = np.deg2rad(yaw)
         r.thrust_cf = thrust
     
 
