@@ -3,6 +3,7 @@ import quad_model
 import detect_markers
 import pose_estim
 import cf
+import post
 from pyqtgraph.Qt import QtGui, QtCore
 import pyqtgraph as pg
 import pyqtgraph.opengl as gl
@@ -147,6 +148,7 @@ class main_ui(QtGui.QWidget):
         self.log['yaw_e'].append(r.yaw_e)
         self.log['pitch_set'].append(r.pitch_set)
         self.log['roll_set'].append(r.roll_set)
+        self.log['yaw_set'].append(r.roll_set)
         self.log['marker_found'].append(r.marker_found)
         if abs(r.tvec[0][0]) < 150:# todo: reconsider this condition
             self.log['x'].append(r.tvec[0][0])
@@ -164,6 +166,7 @@ class main_ui(QtGui.QWidget):
         self.cf_exch._cf.close_link()
         self.improc.cap.release()
         self.improc.terminate()
+        post.write_log(self.log)
         
 
 # Start up the main user-interface
