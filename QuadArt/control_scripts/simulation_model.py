@@ -1,7 +1,8 @@
 '''
 Script for offline simulation of Crazyflie model. It uses model of quadrotor's
 dynamic from online program. This model simulates open-loop system (without
-position feedback but with feedback control of angles and angular velocities)
+position feedback but with feedback control of angles and angular velocities).
+This model tuned with respect to telemetry data taken from real flight of CF.
 '''
 
 import root as r
@@ -10,8 +11,22 @@ import quad_model
 from scipy import integrate
 import numpy as np
 import matplotlib.pyplot as plt
+import sys
+import csv
 
 plt.ion()
+
+# Import log file with telemetry data from CF
+# Write log file name as parameter
+file_name = str(sys.argv[1])
+with open(file_name, 'rb') as csvfile:
+    reader = csv.reader(csvfile, delimiter=',')
+    records_shape = map(int, reader.next())
+    num_rec = records_shape[0]
+    data_matrix = np.zeros(records_shape)
+    field_names = reader.next()
+    for rec in xrange(num_rec):
+        data_matrix[rec,:] = map(float, reader.next())
 
 attitude_rate = 500 # Hz
 dt1 = 1.0 / attitude_rate
@@ -33,13 +48,25 @@ pitch_pid_cf = feedback_control.pid(3.5,2,0,1,dt1)
 pitch_rate_pid_cf = feedback_control.pid(70,0,0,1,dt1)
 
 # Inputs for this model are: thrust set, roll set, pitch set and yaw set
-t_end = 1 # will be replaced by data from real experiment
-#N = t_end / dt1
-N = 400
-roll_set = 5 * np.ones(N)# will be replaced by data from real experiment
-pitch_set = -5 * np.ones(N)# will be replaced by data from real experiment
-yaw_set = 20 * np.ones(N)# will be replaced by data from real experiment
+# Postfix '_ti' in var names means "from telemetry interpolated with new dt"
+time_t = data_matrix[:, field_names.index('time')]
+t_end = time_t[-1]
+N = int(t_end / dt1)
+time_ti = np.interp(np.linspace(0, num_rec, N), np.arange(num_rec), time_t)
+
+# todo: consider to use interpolation from scipy with zero-order hold
+roll_set_ti = np.interp(time_ti, time_t, \
+    data_matrix[:, field_names.index('roll_set')])
+pitch_set_ti = np.interp(time_ti, time_t, \
+    data_matrix[:, field_names.index('pitch_set')])
+yaw_set_ti = np.interp(time_ti, time_t, \
+    data_matrix[:, field_names.index('yaw_set')])
 pwm_set = 36950 * np.ones(N)# will be replaced by data from real experiment
+
+x_ti = np.interp(time_ti, time_t, \
+    data_matrix[:, field_names.index('x')])
+y_ti = np.interp(time_ti, time_t, \
+    data_matrix[:, field_names.index('y')])
 
 # The main simulation loop
 # Initial vector values
@@ -53,17 +80,17 @@ for n in xrange(N):
     r.force = np.interp(rpm, r.rpm_table, r.thrust_table)
     # Calc. feedback control
     # Roll
-    roll_pid_cf.setpoint = roll_set[n]
+    roll_pid_cf.setpoint = roll_set_ti[n]
     roll_rate_pid_cf.setpoint = roll_pid_cf.evaluate(np.rad2deg(y[1][6]))
     roll_rate_out = roll_rate_pid_cf.evaluate(np.rad2deg(y[1][9]))
     roll_rate_out = np.clip(roll_rate_out, -65536, 65536)
     # Pitch
-    pitch_pid_cf.setpoint = pitch_set[n]
+    pitch_pid_cf.setpoint = pitch_set_ti[n]
     pitch_rate_pid_cf.setpoint = pitch_pid_cf.evaluate(np.rad2deg(y[1][7]))
     pitch_rate_out = pitch_rate_pid_cf.evaluate(np.rad2deg(y[1][10]))
     pitch_rate_out = np.clip(pitch_rate_out, -65536, 65536)
     # Yaw
-    yaw_pid_cf.setpoint = yaw_set[n]
+    yaw_pid_cf.setpoint = yaw_set_ti[n]
     yaw_rate_pid_cf.setpoint = yaw_pid_cf.evaluate(np.rad2deg(y[1][8]))
     yaw_rate_out = yaw_rate_pid_cf.evaluate(np.rad2deg(y[1][11]))
     yaw_rate_out = -np.clip(yaw_rate_out, -65536, 65536)
@@ -89,6 +116,6 @@ for n in xrange(N):
     y_hist[:, n] = y[1]
     sim_time += dt1
 
-plt.plot(np.arange(N) * dt1,np.rad2deg(y_hist[6,:]))
-plt.plot(np.arange(N) * dt1,np.rad2deg(y_hist[7,:]))
-plt.plot(np.arange(N) * dt1,np.rad2deg(y_hist[8,:]))
+plt.plot(time_ti,np.rad2deg(y_hist[6,:]))
+plt.plot(time_ti,np.rad2deg(y_hist[7,:]))
+plt.plot(time_ti,np.rad2deg(y_hist[8,:]))
