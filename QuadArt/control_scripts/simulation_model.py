@@ -51,8 +51,8 @@ pitch_rate_pid_cf = feedback_control.pid(70,0,0,1,dt1)
 # Postfix '_ti' in var names means "from telemetry interpolated with new dt"
 time_t = data_matrix[:, field_names.index('time')]
 t_end = time_t[-1]
-N = int(t_end / dt1)
-time_ti = np.interp(np.linspace(0, num_rec, N), np.arange(num_rec), time_t)
+N = int(round(t_end / dt1))
+time_ti = np.interp(np.linspace(0, num_rec - 1, N), np.arange(num_rec), time_t)
 
 # todo: consider to use interpolation from scipy with zero-order hold
 roll_set_ti = np.interp(time_ti, time_t, \
@@ -72,9 +72,8 @@ y_ti = np.interp(time_ti, time_t, \
 # Initial vector values
 y = np.concatenate([r.vel_bi, r.pos_gi, r.angles_gi, r.omega_bi])
 y = np.concatenate([[y],[y]])
-y_hist = np.zeros((y.shape[1], N))
-sim_time = 0
-for n in xrange(N):
+y_hist = np.zeros((y.shape[1], N))# log of state vector
+for n in xrange(N - 1):
     # Calc. force using lookup tables
     rpm = np.interp(pwm_set[n], r.pwm_table, r.rpm_table)
     r.force = np.interp(rpm, r.rpm_table, r.thrust_table)
@@ -94,28 +93,27 @@ for n in xrange(N):
     yaw_rate_pid_cf.setpoint = yaw_pid_cf.evaluate(np.rad2deg(y[1][8]))
     yaw_rate_out = yaw_rate_pid_cf.evaluate(np.rad2deg(y[1][11]))
     yaw_rate_out = -np.clip(yaw_rate_out, -65536, 65536)
-    
+        
     control_out = np.array([pwm_set[n] / 4.0, roll_rate_out, pitch_rate_out,\
         yaw_rate_out])
-    
+        
     # Calc. angular velocities for motors
     motors_pwm = np.dot(M1, control_out)
     motors_rpm = np.interp(motors_pwm, r.pwm_table, r.rpm_table)
     motors_force = np.interp(motors_rpm, r.rpm_table, r.thrust_table) * r.g
-    motors_w = 2 * np.pi * motors_rpm / 60.0
+    motors_w = 2 * np.pi * motors_rpm / 60.0# rad/sec
     # Calc. moment about z axis
     r.tau_psi = np.dot(np.array([-r.k2,r.k2,-r.k2,r.k2]),pow(motors_w,2))
-    
+        
     # Calc. moments about x and y axes
     r.tau_phi = np.dot(M2[0],motors_force)
     r.tau_theta = np.dot(M2[1],motors_force)
-    
+        
     # Integrate system of nonlinear ODE
     y = integrate.odeint(quad_model.rhs,y[1], \
-        np.array([sim_time, sim_time + dt1]))
+        np.array([time_ti[n], time_ti[n + 1]]), rtol=1e-5)
     y_hist[:, n] = y[1]
-    sim_time += dt1
 
-plt.plot(time_ti,np.rad2deg(y_hist[6,:]))
-plt.plot(time_ti,np.rad2deg(y_hist[7,:]))
-plt.plot(time_ti,np.rad2deg(y_hist[8,:]))
+plt.plot(time_ti[0:-1],np.rad2deg(y_hist[6,0:-1]))
+plt.plot(time_ti[0:-1],np.rad2deg(y_hist[7,0:-1]))
+plt.plot(time_ti[0:-1],np.rad2deg(y_hist[8,0:-1]))
