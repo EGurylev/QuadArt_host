@@ -148,7 +148,7 @@ class main_ui(QtGui.QWidget):
         self.log['yaw_e'].append(r.yaw_e)
         self.log['pitch_set'].append(r.pitch_set)
         self.log['roll_set'].append(r.roll_set)
-        self.log['yaw_set'].append(r.roll_set)
+        self.log['yaw_set'].append(r.yaw_set)
         self.log['marker_found'].append(r.marker_found)
         if abs(r.tvec[0][0]) < 150:# todo: reconsider this condition
             self.log['x'].append(r.tvec[0][0])
