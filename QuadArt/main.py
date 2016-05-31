@@ -63,7 +63,8 @@ class main_ui(QtGui.QWidget):
         
         # Thread for data exchange with crazyflie
         self.cf_exch = cf.crazyflie_thread()
-        self.connect(self.cf_exch, QtCore.SIGNAL("Sig_cf(PyQt_PyObject, PyQt_PyObject, PyQt_PyObject, PyQt_PyObject)"), \
+        self.connect(self.cf_exch, QtCore.SIGNAL("Sig_cf(PyQt_PyObject,PyQt_PyObject,\
+            PyQt_PyObject,PyQt_PyObject,PyQt_PyObject)"), \
             self.cf_thread_done, QtCore.Qt.DirectConnection)
         self.cf_exch.start()
 
@@ -86,7 +87,8 @@ class main_ui(QtGui.QWidget):
                     'x': collections.deque(),
                     'y': collections.deque(),
                     'z': collections.deque(),
-                    'marker_found': collections.deque()}
+                    'marker_found': collections.deque(),
+                    'vbat': collections.deque()}
         
         self.plot_item = self.plot_w.plot(self.plot_buffer_x, self.plot_buffer_y)
         self.timer = QtCore.QTimer()
@@ -104,11 +106,12 @@ class main_ui(QtGui.QWidget):
         self.plot_item.setData(self.plot_buffer_x, self.plot_buffer_y)
         
         
-    def cf_thread_done(self, roll, pitch, yaw, thrust):
+    def cf_thread_done(self, roll, pitch, yaw, thrust, vbat):
         r.roll_cf = np.deg2rad(roll)
         r.pitch_cf = np.deg2rad(pitch)
         r.yaw_cf = np.deg2rad(yaw)
         r.thrust_cf = thrust
+        r.vbat = vbat
     
 
     def update(self):
@@ -150,6 +153,7 @@ class main_ui(QtGui.QWidget):
         self.log['roll_set'].append(r.roll_set)
         self.log['yaw_set'].append(r.yaw_set)
         self.log['marker_found'].append(r.marker_found)
+        self.log['vbat'].append(r.vbat)
         if abs(r.tvec[0][0]) < 150:# todo: reconsider this condition
             self.log['x'].append(r.tvec[0][0])
             self.log['y'].append(r.tvec[2][0])

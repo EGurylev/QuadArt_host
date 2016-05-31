@@ -19,7 +19,7 @@ dist_coeffs = np.zeros((5,1))
 
 # Crazyflie config
 link_uri = 'radio://0/80/250K'
-thrust_eq = 40000 # equilibrium point
+thrust_eq = 40500 # equilibrium point
 
 # Angles from IMU
 roll_cf = 0
@@ -36,6 +36,8 @@ yaw_set = 0
 # Pose controller parameters
 thrust_set = 0
 thrust_cf = 0
+# Battery voltage
+vbat = 0
 
 # Marker points from camera
 corner_coord = np.zeros([4,2])
@@ -43,7 +45,7 @@ corner_coord = np.zeros([4,2])
 # Model parameters
 g = 9.81 # gravity acceleration
 mass = 0.029 # quadrotor's mass + mass of a marker
-l = 0.2 # length of arm
+l = 0.045 # length of arm
 force = 0.0 # Force
 j_xx = 2.3951e-5 # moment of inertia according to x axis
 j_yy = 2.3951e-5 # moment of inertia according to y axis
@@ -61,8 +63,8 @@ rpm_table = np.array([0,4485,7570,9374,10885,12277,13522,14691,15924,17174,
 thrust_table = np.array([0,1.6,4.8,7.9,10.9,13.9,17.3,21.0,24.4,28.6,32.8,
     37.3,41.7,46.0,51.9,57.9]) / 1e3 # kg
 
-k1 = 0.005022; # coefficient which relates force with command signals
-k2 = 1.858e-5; # coefficient which relates torque with command signals
+k1 = 0.005022; # coefficient which relates force with command signals (consider to remove it)
+k2 = 1.858e-8; # coefficient which relates torque with command signals (should be tuned)
 dt = 0.02
 t = 0
 

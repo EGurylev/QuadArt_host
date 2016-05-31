@@ -20,7 +20,8 @@ class crazyflie_thread(QtCore.QThread):
         self._cf.connection_lost.add_callback(self._connection_lost)
         self.roll = self.pitch = self.yaw = 0
         self.thrust = 0
-        self.Sig_cf = QtCore.pyqtSignal(float, float, float, int)
+        self.vbat = 0
+        self.Sig_cf = QtCore.pyqtSignal(float, float, float, int, float)
         
         
     def run(self):
@@ -28,7 +29,7 @@ class crazyflie_thread(QtCore.QThread):
         self._cf.open_link(r.link_uri)
         while True:
             time.sleep(r.dt)
-            self.emit(QtCore.SIGNAL("Sig_cf(PyQt_PyObject, PyQt_PyObject, PyQt_PyObject, PyQt_PyObject)"), self.roll, self.pitch, self.yaw, self.thrust)
+            self.emit(QtCore.SIGNAL("Sig_cf(PyQt_PyObject, PyQt_PyObject, PyQt_PyObject, PyQt_PyObject, PyQt_PyObject)"), self.roll, self.pitch, self.yaw, self.thrust, self.vbat)
             
     def _do_control(self):
         # Thrust control
@@ -70,12 +71,15 @@ class crazyflie_thread(QtCore.QThread):
         has been connected and the TOCs have been downloaded."""
         print "Connected to %s" % link_uri
 
-        # The definition of the logconfig can be made before connecting
+        # Log configuration for stabilizer group
         self._lg_stab = LogConfig(name="Stabilizer", period_in_ms=1000 * r.dt)
         self._lg_stab.add_variable("stabilizer.roll", "float")
         self._lg_stab.add_variable("stabilizer.pitch", "float")
         self._lg_stab.add_variable("stabilizer.yaw", "float")
         self._lg_stab.add_variable("stabilizer.thrust", "uint16_t")
+        # Log configuration for battery group
+        self._lg_bat = LogConfig(name="Battery", period_in_ms=1000 * r.dt)
+        self._lg_bat.add_variable("pm.vbat", "float")
         # Start control loop thread
         Thread(target=self._do_control).start()
         
@@ -84,12 +88,16 @@ class crazyflie_thread(QtCore.QThread):
         # would like to log are in the TOC.
         try:
             self._cf.log.add_config(self._lg_stab)
+            self._cf.log.add_config(self._lg_bat)
             # This callback will receive the data
             self._lg_stab.data_received_cb.add_callback(self._stab_log_data)
+            self._lg_bat.data_received_cb.add_callback(self._bat_log_data)
             # This callback will be called on errors
             self._lg_stab.error_cb.add_callback(self._stab_log_error)
+            self._lg_bat.error_cb.add_callback(self._bat_log_error)
             # Start the logging
             self._lg_stab.start()
+            self._lg_bat.start()
         except KeyError as e:
             print "Could not start log configuration," \
                   "{} not found in TOC".format(str(e))
@@ -99,6 +107,10 @@ class crazyflie_thread(QtCore.QThread):
     def _stab_log_error(self, logconf, msg):
         """Callback from the log API when an error occurs"""
         print "Error when logging %s: %s" % (logconf.name, msg)
+        
+    def _bat_log_error(self, logconf, msg):
+        """Callback from the log API when an error occurs"""
+        print "Error when logging %s: %s" % (logconf.name, msg)
 
     def _stab_log_data(self, timestamp, data, logconf):
         """Callback froma the log API when data arrives"""
@@ -106,6 +118,10 @@ class crazyflie_thread(QtCore.QThread):
         self.pitch = data['stabilizer.pitch']
         self.yaw = data['stabilizer.yaw']
         self.thrust = data['stabilizer.thrust']
+        
+    def _bat_log_data(self, timestamp, data, logconf):
+        """Callback froma the log API when data arrives"""
+        self.vbat = data['pm.vbat']
 
     def _connection_failed(self, link_uri, msg):
         """Callback when connection initial connection fails (i.e no Crazyflie
