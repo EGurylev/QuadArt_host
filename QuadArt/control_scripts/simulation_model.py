@@ -117,7 +117,8 @@ for n in xrange(N - 1):
     if marker_found[n] and cf_connected[n]:
         if not cf_connected[n - 1]:
             # Initialize position and angles
-            y[1][6:9] = np.array([roll_cf_ti[n], pitch_cf_ti[n], yaw_cf_ti[n]])
+            y[1][6:9] = np.deg2rad(np.array([roll_cf_ti[n], pitch_cf_ti[n], \
+                yaw_cf_ti[n]]))
             y[1][3:6] = np.array([x_ti[n], y_ti[n], z_ti[n]])
             
         # Calc. outer loop feedback control. It runs slower than inner loop.
