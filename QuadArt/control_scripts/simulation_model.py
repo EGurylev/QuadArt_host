@@ -80,6 +80,12 @@ yaw_set_ti = np.interp(time_ti, time_t, \
 yaw_set_ti = np.zeros(N)
 roll_set_ti = np.zeros(N)
 pitch_set_ti = np.zeros(N)
+roll_cf_ti = np.interp(time_ti, time_t, \
+    data_matrix[:, field_names.index('roll_cf')])
+pitch_cf_ti = np.interp(time_ti, time_t, \
+    data_matrix[:, field_names.index('pitch_cf')])
+yaw_cf_ti = np.interp(time_ti, time_t, \
+    data_matrix[:, field_names.index('yaw_cf')])
 marker_found = np.interp(time_ti, time_t, \
     data_matrix[:, field_names.index('marker_found')])
 #pwm_set = np.interp(time_ti, time_t, \
@@ -101,7 +107,7 @@ cf_connected = vbat_ti != 0.0
 
 # The main simulation loop
 # Initial vector values
-y = np.concatenate([r.vel_bi, r.pos_gi, r.angles_gi, r.omega_bi])
+y = np.zeros(12)
 y = np.concatenate([[y],[y]])
 y_hist = np.zeros((y.shape[1], N))# log of state vector
 thrust_set = 0# initial value
@@ -109,6 +115,11 @@ pitch_set = 0# initial value
 roll_set = 0# initial value
 for n in xrange(N - 1):
     if marker_found[n] and cf_connected[n]:
+        if not cf_connected[n - 1]:
+            # Initialize position and angles
+            y[1][6:9] = np.array([roll_cf_ti[n], pitch_cf_ti[n], yaw_cf_ti[n]])
+            y[1][3:6] = np.array([x_ti[n], y_ti[n], z_ti[n]])
+            
         # Calc. outer loop feedback control. It runs slower than inner loop.
         if n % int(dt2 / dt1) == 0:
             thrust_set = z_pid_cf.evaluate(y_hist[5, n - delay] * 1e2) + thrust_eq
