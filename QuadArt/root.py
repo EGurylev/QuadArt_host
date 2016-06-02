@@ -62,6 +62,8 @@ rpm_table = np.array([0,4485,7570,9374,10885,12277,13522,14691,15924,17174,
     18179,19397,20539,21692,22598,23882]) # revolutions per minute
 thrust_table = np.array([0,1.6,4.8,7.9,10.9,13.9,17.3,21.0,24.4,28.6,32.8,
     37.3,41.7,46.0,51.9,57.9]) / 1e3 # kg
+# Thrust vs voltage polynomial fit (polynomial coefficients):
+thrust_volt_fit = np.array([3.747, 5.804, 0.745]) # volts to grams
 
 k1 = 0.005022; # coefficient which relates force with command signals (consider to remove it)
 k2 = 1.858e-8; # coefficient which relates torque with command signals (should be tuned)
