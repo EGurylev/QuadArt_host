@@ -32,7 +32,7 @@ with open(file_name, 'rb') as csvfile:
 attitude_rate = 500 # Hz
 dt1 = 1.0 / attitude_rate
 dt2 = r.dt # sample time for outer control loop within PC (position)
-delay = 1 * int(dt2 / dt1) # delay of outer control loop (in terms of dt2)
+delay = 2 * int(dt2 / dt1) # delay of outer control loop (in terms of dt2)
 
 # Calc. rpm and pwm output for equilibrium point   
 rpm_eq = np.interp(r.mass, r.thrust_table, r.rpm_table)
@@ -122,7 +122,7 @@ for n in xrange(N - 1):
             y[1][3:6] = np.array([x_ti[n], y_ti[n], z_ti[n]])
             
         # Calc. outer loop feedback control. It runs slower than inner loop.
-        if n % int(dt2 / dt1) == 0:
+        if n % delay == 0:
             thrust_set = z_pid_cf.evaluate(y_hist[5, n - delay] * 1e2) + thrust_eq
             pitch_set = x_pid_cf.evaluate(y_hist[3, n - delay] * 1e2)
             roll_set = -y_pid_cf.evaluate(y_hist[4, n - delay] * 1e2)
