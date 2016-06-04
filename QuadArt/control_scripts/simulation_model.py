@@ -56,11 +56,11 @@ pitch_pid_cf = feedback_control.pid(3.5,2,0,1,dt1)
 pitch_rate_pid_cf = feedback_control.pid(70,0,0,1,dt1)
 
 # Init outer loop pid controllers
-z_pid_cf = feedback_control.pid(80,30,90,0.35,dt2, upper=7000, lower=-7000, sat_flag=True)
+z_pid_cf = feedback_control.pid(80,30,90,0.35,1/30.0, upper=7000, lower=-7000, sat_flag=True)
 z_pid_cf.setpoint = 0.0
-x_pid_cf = feedback_control.pid(0.2,0.04,0.22,0.15,dt2, upper=20, lower=-20, sat_flag=True)
+x_pid_cf = feedback_control.pid(0.2,0.04,0.22,0.15,1/30.0, upper=20, lower=-20, sat_flag=True)
 x_pid_cf.setpoint = 0.0
-y_pid_cf = feedback_control.pid(0.2,0.06,0.22,0.15,dt2, upper=20, lower=-20, sat_flag=True)
+y_pid_cf = feedback_control.pid(0.2,0.06,0.22,0.15,1/30.0, upper=20, lower=-20, sat_flag=True)
 y_pid_cf.setpoint = 80.0
 
 # Inputs for this model are: thrust set, roll set, pitch set and yaw set
@@ -77,9 +77,6 @@ pitch_set_ti = np.interp(time_ti, time_t, \
     data_matrix[:, field_names.index('pitch_set')])
 yaw_set_ti = np.interp(time_ti, time_t, \
     data_matrix[:, field_names.index('yaw_set')])
-yaw_set_ti = np.zeros(N)
-roll_set_ti = np.zeros(N)
-pitch_set_ti = np.zeros(N)
 roll_cf_ti = np.interp(time_ti, time_t, \
     data_matrix[:, field_names.index('roll_cf')])
 pitch_cf_ti = np.interp(time_ti, time_t, \
@@ -122,7 +119,7 @@ for n in xrange(N - 1):
             y[1][3:6] = np.array([x_ti[n], y_ti[n], z_ti[n]])
             
         # Calc. outer loop feedback control. It runs slower than inner loop.
-        if n % delay == 0:
+        if n % int(dt2 / dt1) == 0:
             thrust_set = z_pid_cf.evaluate(y_hist[5, n - delay] * 1e2) + thrust_eq
             pitch_set = x_pid_cf.evaluate(y_hist[3, n - delay] * 1e2)
             roll_set = -y_pid_cf.evaluate(y_hist[4, n - delay] * 1e2)
@@ -164,7 +161,6 @@ for n in xrange(N - 1):
         r.force = np.interp(rpm, r.rpm_table, r.thrust_table) * r.g
         # Calc. force using voltage-thrust plynomial fit (alternative)
         #r.force = np.polyval(r.thrust_volt_fit, vbat_ti[n] * thrust_set / 65536.0) * 1e-3 * r.g
-           
         # Integrate system of nonlinear ODEs
         y = integrate.odeint(quad_model.rhs,y[1], \
             np.array([time_ti[n], time_ti[n + 1]]), rtol=1e-5)
@@ -173,4 +169,10 @@ for n in xrange(N - 1):
 
 plt.plot(time_ti[0:-1],z_ti[0:-1])
 plt.plot(time_ti[0:-1],y_hist[5,0:-1])
+
+plt.plot(time_ti[0:-1],x_ti[0:-1])
+plt.plot(time_ti[0:-1],y_hist[3,0:-1])
+
+plt.plot(time_ti[0:-1],y_ti[0:-1])
+plt.plot(time_ti[0:-1],y_hist[4,0:-1])
 
