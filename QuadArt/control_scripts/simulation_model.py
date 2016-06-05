@@ -105,45 +105,47 @@ cf_connected = vbat_ti != 0.0
 # The main simulation loop
 # Initial vector values
 y = np.zeros(12)
+y[4] = r.tvec[2]
 y = np.concatenate([[y],[y]])
 y_hist = np.zeros((y.shape[1], N))# log of state vector
 thrust_set = 0# initial value
 pitch_set = 0# initial value
 roll_set = 0# initial value
 for n in xrange(N - 1):
-    if marker_found[n] and cf_connected[n]:
-        if not cf_connected[n - 1]:
-            # Initialize position and angles
-            y[1][6:9] = np.deg2rad(np.array([roll_cf_ti[n], pitch_cf_ti[n], \
-                yaw_cf_ti[n]]))
-            y[1][3:6] = np.array([x_ti[n], y_ti[n], z_ti[n]])
+    if marker_found[n] and not marker_found[n - int(dt2 / dt1)]:
+        # Initialize position and angles
+        y[1][6:9] = np.deg2rad(np.array([roll_cf_ti[n], pitch_cf_ti[n], \
+            yaw_cf_ti[n]]))
+        y[1][3:6] = np.array([x_ti[n], y_ti[n], z_ti[n]])
             
-        # Calc. outer loop feedback control. It runs slower than inner loop.
-        if n % int(dt2 / dt1) == 0:
-            thrust_set = z_pid_cf.evaluate(y_hist[5, n - delay] * 1e2) + thrust_eq
-            pitch_set = x_pid_cf.evaluate(y_hist[3, n - delay] * 1e2)
-            roll_set = -y_pid_cf.evaluate(y_hist[4, n - delay] * 1e2)
+    # Calc. outer loop feedback control. It runs slower than inner loop.
+    if n % int(dt2 / dt1) == 0:
+        thrust_set = z_pid_cf.evaluate(y_hist[5, n - delay] * 1e2) + thrust_eq
+        pitch_set = x_pid_cf.evaluate(y_hist[3, n - delay] * 1e2)
+        roll_set = -y_pid_cf.evaluate(y_hist[4, n - delay] * 1e2)
         
-        # Calc. inner loop feedback control
-        # Roll
-        roll_pid_cf.setpoint = roll_set
-        roll_rate_pid_cf.setpoint = roll_pid_cf.evaluate(np.rad2deg(y[1][6]))
-        roll_rate_out = roll_rate_pid_cf.evaluate(np.rad2deg(y[1][9]))
-        roll_rate_out = np.clip(roll_rate_out, -65536, 65536)
-        # Pitch
-        pitch_pid_cf.setpoint = pitch_set
-        pitch_rate_pid_cf.setpoint = pitch_pid_cf.evaluate(np.rad2deg(y[1][7]))
-        pitch_rate_out = pitch_rate_pid_cf.evaluate(np.rad2deg(y[1][10]))
-        pitch_rate_out = np.clip(pitch_rate_out, -65536, 65536)
-        # Yaw
-        yaw_pid_cf.setpoint = yaw_set_ti[n]
-        yaw_rate_pid_cf.setpoint = yaw_pid_cf.evaluate(np.rad2deg(y[1][8]))
-        yaw_rate_out = yaw_rate_pid_cf.evaluate(np.rad2deg(y[1][11]))
-        yaw_rate_out = -np.clip(yaw_rate_out, -65536, 65536)
+    # Calc. inner loop feedback control
+    # Roll
+    roll_pid_cf.setpoint = roll_set
+    roll_rate_pid_cf.setpoint = roll_pid_cf.evaluate(np.rad2deg(y[1][6]))
+    roll_rate_out = roll_rate_pid_cf.evaluate(np.rad2deg(y[1][9]))
+    roll_rate_out = np.clip(roll_rate_out, -65536, 65536)
+    # Pitch
+    pitch_pid_cf.setpoint = pitch_set
+    pitch_rate_pid_cf.setpoint = pitch_pid_cf.evaluate(np.rad2deg(y[1][7]))
+    pitch_rate_out = pitch_rate_pid_cf.evaluate(np.rad2deg(y[1][10]))
+    pitch_rate_out = np.clip(pitch_rate_out, -65536, 65536)
+    # Yaw
+    yaw_pid_cf.setpoint = yaw_set_ti[n]
+    yaw_rate_pid_cf.setpoint = yaw_pid_cf.evaluate(np.rad2deg(y[1][8]))
+    yaw_rate_out = yaw_rate_pid_cf.evaluate(np.rad2deg(y[1][11]))
+    yaw_rate_out = -np.clip(yaw_rate_out, -65536, 65536)
             
-        control_out = np.array([thrust_set, roll_rate_out, pitch_rate_out,\
-            yaw_rate_out])
+    control_out = np.array([thrust_set, roll_rate_out, pitch_rate_out,\
+        yaw_rate_out])
             
+    # Outer loop feedback control works only when connection with CF is established
+    if cf_connected[n]:
         # Calc. angular velocities for motors
         motors_pwm = np.dot(M1, control_out)
         motors_rpm = np.interp(motors_pwm, r.pwm_table, r.rpm_table)
@@ -151,20 +153,26 @@ for n in xrange(N - 1):
         motors_w = 2 * np.pi * motors_rpm / 60.0# rad/sec
         # Calc. moment about z axis
         r.tau_psi = np.dot(np.array([-r.k2,r.k2,-r.k2,r.k2]),pow(motors_w,2))
-            
+                
         # Calc. moments about x and y axes
         r.tau_phi = np.dot(M2[0],motors_force)
         r.tau_theta = np.dot(M2[1],motors_force)
-        
+            
         # Calc. force using lookup tables
         rpm = np.interp(motors_pwm.sum() / 4.0, r.pwm_table, r.rpm_table)
         r.force = np.interp(rpm, r.rpm_table, r.thrust_table) * r.g
-        # Calc. force using voltage-thrust plynomial fit (alternative)
-        #r.force = np.polyval(r.thrust_volt_fit, vbat_ti[n] * thrust_set / 65536.0) * 1e-3 * r.g
-        # Integrate system of nonlinear ODEs
-        y = integrate.odeint(quad_model.rhs,y[1], \
-            np.array([time_ti[n], time_ti[n + 1]]), rtol=1e-5)
-        y_hist[:, n] = y[1]
+    else:
+        r.force = r.mass * r.g # valid before launch
+        r.tau_psi = 0
+        r.tau_phi = 0
+        r.tau_theta = 0
+    # Calc. force using voltage-thrust plynomial fit (alternative)
+    #r.force = np.polyval(r.thrust_volt_fit, vbat_ti[n] * thrust_set / 65536.0) * 1e-3 * r.g
+    # Integrate system of nonlinear ODEs
+    y = integrate.odeint(quad_model.rhs,y[1], \
+        np.array([time_ti[n], time_ti[n + 1]]), rtol=1e-5)
+    y[1,4] += (np.random.randn(1) - np.random.randn(1)) * 1e-3
+    y_hist[:, n] = y[1]
 
 
 plt.plot(time_ti[0:-1],z_ti[0:-1])
