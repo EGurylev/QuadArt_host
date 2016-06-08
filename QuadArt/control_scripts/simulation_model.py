@@ -85,10 +85,10 @@ yaw_cf_ti = np.interp(time_ti, time_t, \
     data_matrix[:, field_names.index('yaw_cf')])
 marker_found = np.interp(time_ti, time_t, \
     data_matrix[:, field_names.index('marker_found')])
-#pwm_set = np.interp(time_ti, time_t, \
-    #data_matrix[:, field_names.index('thrust_set')]) + r.thrust_eq
-#thrust_cf_ti = np.interp(time_ti, time_t, \
-    #data_matrix[:, field_names.index('thrust_cf')])
+thrust_cf_ti = np.interp(time_ti, time_t, \
+    data_matrix[:, field_names.index('thrust_cf')])
+thrust_set_ti = np.interp(time_ti, time_t, \
+    data_matrix[:, field_names.index('thrust_set')]) + r.thrust_eq
 
 x_ti = np.interp(time_ti, time_t, \
     data_matrix[:, field_names.index('x')]) / 1e2# cm to m
@@ -105,7 +105,7 @@ cf_connected = vbat_ti != 0.0
 # The main simulation loop
 # Initial vector values
 y = np.zeros(12)
-y[4] = r.tvec[2]
+y[4] = r.tvec[2] / 1e2
 y = np.concatenate([[y],[y]])
 y_hist = np.zeros((y.shape[1], N))# log of state vector
 thrust_set = 0# initial value
@@ -120,9 +120,12 @@ for n in xrange(N - 1):
             
     # Calc. outer loop feedback control. It runs slower than inner loop.
     if n % int(dt2 / dt1) == 0:
-        thrust_set = z_pid_cf.evaluate(y_hist[5, n - delay] * 1e2) + thrust_eq
-        pitch_set = x_pid_cf.evaluate(y_hist[3, n - delay] * 1e2)
-        roll_set = -y_pid_cf.evaluate(y_hist[4, n - delay] * 1e2)
+        z_meas = (y_hist[5, n - delay] + (np.random.randn() - np.random.randn()) * 1e-5) * 1e2
+        x_meas = (y_hist[3, n - delay] + (np.random.randn() - np.random.randn()) * 1e-5) * 1e2
+        y_meas = (y_hist[4, n - delay] + (np.random.randn() - np.random.randn()) * 1e-4) * 1e2
+        thrust_set = z_pid_cf.evaluate(z_meas) + thrust_eq
+        pitch_set = x_pid_cf.evaluate(x_meas)
+        roll_set = -y_pid_cf.evaluate(y_meas)
         
     # Calc. inner loop feedback control
     # Roll
@@ -153,14 +156,11 @@ for n in xrange(N - 1):
         motors_w = 2 * np.pi * motors_rpm / 60.0# rad/sec
         # Calc. moment about z axis
         r.tau_psi = np.dot(np.array([-r.k2,r.k2,-r.k2,r.k2]),pow(motors_w,2))
-                
+
         # Calc. moments about x and y axes
         r.tau_phi = np.dot(M2[0],motors_force)
         r.tau_theta = np.dot(M2[1],motors_force)
-            
-        # Calc. force using lookup tables
-        rpm = np.interp(motors_pwm.sum() / 4.0, r.pwm_table, r.rpm_table)
-        r.force = np.interp(rpm, r.rpm_table, r.thrust_table) * r.g
+        r.force = motors_force.sum()
     else:
         r.force = r.mass * r.g # valid before launch
         r.tau_psi = 0
@@ -171,9 +171,7 @@ for n in xrange(N - 1):
     # Integrate system of nonlinear ODEs
     y = integrate.odeint(quad_model.rhs,y[1], \
         np.array([time_ti[n], time_ti[n + 1]]), rtol=1e-5)
-    y[1,4] += (np.random.randn(1) - np.random.randn(1)) * 1e-3
     y_hist[:, n] = y[1]
-
 
 plt.plot(time_ti[0:-1],z_ti[0:-1])
 plt.plot(time_ti[0:-1],y_hist[5,0:-1])
@@ -183,4 +181,3 @@ plt.plot(time_ti[0:-1],y_hist[3,0:-1])
 
 plt.plot(time_ti[0:-1],y_ti[0:-1])
 plt.plot(time_ti[0:-1],y_hist[4,0:-1])
-
