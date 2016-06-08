@@ -39,7 +39,7 @@ rpm_eq = np.interp(r.mass, r.thrust_table, r.rpm_table)
 thrust_eq = np.interp(rpm_eq, r.rpm_table, r.pwm_table)
 
 # Matrix which maps pid controllers' outputs into motors' pwm 
-M1 = np.array([[1,0,1,1], [1,-1,0,-1], [1,1,-1,1], [1,1,0,-1]])
+M1 = np.array([[1,0,1,1], [1,-1,0,-1], [1,0,-1,1], [1,1,0,-1]])
 # Matrix which maps forces produced by motors into torques
 M2 = np.array([[0,-r.l,0,r.l], [r.l,0,-r.l,0]])
 motors_pwm = np.zeros(4)
