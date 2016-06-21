@@ -132,7 +132,7 @@ cdef extern from "pylon/PylonIncludes.h" namespace 'Pylon':
         void Close()
         bool IsOpen()
         IPylonDevice* DetachDevice()
-        void StartGrabbing(size_t maxImages)    #FIXME: implement different strategies
+        void StartGrabbing()    #FIXME: implement different strategies
         bool IsGrabbing()
         bool RetrieveResult(unsigned int timeout_ms, CGrabResultPtr& grab_result)  # FIXME: Timout handling
         INodeMap& GetNodeMap()

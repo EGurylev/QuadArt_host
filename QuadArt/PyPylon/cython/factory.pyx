@@ -202,23 +202,18 @@ cdef class Camera:
 
     def __repr__(self):
         return '<Camera {0} open={1}>'.format(self.device_info.friendly_name, self.opened)
+        
+    def camera_init(self):
+        self.camera.StartGrabbing()
 
-    def grab_images(self, int nr_images, unsigned int timeout=5000):
+    def grab_image(self, unsigned int timeout=5000):
         if not self.opened:
             raise RuntimeError('Camera not opened')
-
-        self.camera.StartGrabbing(nr_images)
 
         cdef CGrabResultPtr ptr_grab_result
         cdef IImage* img
         cdef CPylonImage dst_img
         cdef CImageFormatConverter converter
-
-        cdef str image_format = str(self.properties['PixelFormat'])
-        cdef str bits_per_pixel_prop = str(self.properties['PixelSize'])
-        assert bits_per_pixel_prop.startswith('Bpp'), 'PixelSize property should start with "Bpp"'
-        #assert image_format.startswith('Mono'), 'Only mono images allowed at this point'
-        assert not image_format.endswith('p'), 'Packed data not supported at this point'
 
         while self.camera.IsGrabbing():
             self.camera.RetrieveResult(timeout, ptr_grab_result)
@@ -227,7 +222,6 @@ cdef class Camera:
                 error_desc = (<string>(ACCESS_CGrabResultPtr_GetErrorDescription(ptr_grab_result))).decode()
                 raise RuntimeError(error_desc)
 
-            #img = &(<IImage&>ptr_grab_result)
             converter.OutputPixelFormat.SetValue(PixelType_RGB8packed)
             converter.Convert( dst_img, ptr_grab_result)
             img = &(<IImage&>dst_img)
@@ -243,19 +237,15 @@ cdef class Camera:
 
             assert not img.GetPaddingX(), 'Image padding not supported.'
             # TODO: Check GetOrientation to fix oritentation of image if required.
-            print('Bytes:', img.GetImageSize())
-            print img.IsValid()
-            print img.GetHeight()
-            print img.GetWidth()
-            img_data = np.frombuffer((<char*>img.GetBuffer())[:img.GetImageSize()], dtype='uint'+bits_per_pixel_prop[3:])
+            #print('Bytes:', img.GetImageSize())
+            #print img.IsValid()
+            #print img.GetHeight()
+            #print img.GetWidth()
+            img_data = np.frombuffer((<char*>img.GetBuffer())[:img.GetImageSize()], dtype='uint8')
 
-            # TODO: How to handle multi-byte data here?
             img_data = img_data.reshape((img.GetHeight(), img.GetWidth(), 3))
-            # img_data = img_data[:img.GetHeight(), :img.GetWidth()]
-            yield img_data
+            return img_data
 
-    def grab_image(self, unsigned int timeout=5000):
-        return next(self.grab_images(1, timeout))
 
     property properties:
         def __get__(self):
