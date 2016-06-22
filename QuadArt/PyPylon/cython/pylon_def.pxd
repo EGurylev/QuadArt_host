@@ -82,6 +82,14 @@ cdef extern from "pylon/PylonIncludes.h" namespace 'Pylon':
     cdef enum EPixelType:
         PixelType_BayerBG8
         PixelType_RGB8packed
+        
+    cdef enum EGrabStrategy:
+        GrabStrategy_OneByOne
+        GrabStrategy_LatestImageOnly
+        
+    cdef enum EGrabLoop:
+        GrabLoop_ProvidedByInstantCamera
+        GrabLoop_ProvidedByUser
 
     cdef cppclass IImage:
         uint32_t GetWidth()
@@ -132,7 +140,8 @@ cdef extern from "pylon/PylonIncludes.h" namespace 'Pylon':
         void Close()
         bool IsOpen()
         IPylonDevice* DetachDevice()
-        void StartGrabbing()    #FIXME: implement different strategies
+        void StartGrabbing(EGrabStrategy, EGrabLoop)
+        void StopGrabbing()
         bool IsGrabbing()
         bool RetrieveResult(unsigned int timeout_ms, CGrabResultPtr& grab_result)  # FIXME: Timout handling
         INodeMap& GetNodeMap()

@@ -204,7 +204,10 @@ cdef class Camera:
         return '<Camera {0} open={1}>'.format(self.device_info.friendly_name, self.opened)
         
     def camera_init(self):
-        self.camera.StartGrabbing()
+        self.camera.StartGrabbing(GrabStrategy_LatestImageOnly, GrabLoop_ProvidedByUser)
+        
+    def camera_stop(self):
+        self.camera.StopGrabbing()
 
     def grab_image(self, unsigned int timeout=5000):
         if not self.opened:
