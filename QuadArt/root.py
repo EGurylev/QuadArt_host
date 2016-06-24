@@ -4,7 +4,7 @@ import math
 from geometry import * 
 
 #Image resolution
-w, h = 1280, 720
+w, h = 1280, 1024
 
 #Camera parameters
 f = 1180.0
@@ -66,7 +66,7 @@ thrust_table = np.array([0,1.6,4.8,7.9,10.9,13.9,17.3,21.0,24.4,28.6,32.8,
 thrust_volt_fit = np.array([3.747, 5.804, 0.745]) # volts to grams
 
 k1 = 0.005022; # coefficient which relates force with command signals (consider to remove it)
-k2 = 1.858e-8; # coefficient which relates torque with command signals (should be tuned)
+k2 = 1.858e-10; # coefficient which relates torque with command signals (should be tuned)
 dt = 0.02
 t = 0
 

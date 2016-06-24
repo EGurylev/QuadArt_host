@@ -100,7 +100,10 @@ class main_ui(QtGui.QWidget):
         r.marker_found = marker_found
         if r.marker_found:
             pose_estim.calc_pose()
-        self.im_w.setImage(np.rot90(frame))
+        try:
+            self.im_w.setImage(np.rot90(frame))
+        except Exception:
+            pass
         self.plot_buffer_y.append(r.tvec[2][0])
         self.plot_buffer_x.append(r.t)
         self.plot_item.setData(self.plot_buffer_x, self.plot_buffer_y)
@@ -168,7 +171,8 @@ class main_ui(QtGui.QWidget):
         self.timer.stop()
         self.cf_exch.terminate()
         self.cf_exch._cf.close_link()
-        self.improc.cap.release()
+        self.improc.cam.close()
+        self.improc.cam.camera_stop()
         self.improc.terminate()
         post.write_log(self.log)
         

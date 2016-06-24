@@ -1,24 +1,29 @@
 import root as r
+import pypylon
 from scipy import signal
 from scipy import misc
 from pyqtgraph.Qt import QtCore
 import numpy as np
 import math
 import cv2
+import time
 
 class image_thread(QtCore.QThread):
     def __init__(self, parent=None):
         super(image_thread, self).__init__(parent)
-        #Initial settings
+        # Initial settings
         self.perimeter_prev = 200
         self.marker_size = self.perimeter_prev / 4
         self.area_prev = self.marker_size * self.marker_size
         self.marker_coord = np.array([r.w / 2, r.h / 2], dtype=np.int32)# Center of a marker
         self.win_scale = 2 # scale factor for search window
         self.marker_found_prev = False
-        self.cap = cv2.VideoCapture(0)
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, r.w)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, r.h)
+        # Init Basler camera
+        available_cameras = pypylon.factory.find_devices()
+        self.cam = pypylon.factory.create_device(available_cameras[0])
+        self.cam.open()
+        self.cam.camera_init()
+        
         self.marker_found = False
         self.Sig = QtCore.pyqtSignal(np.ndarray, bool, float)
         
@@ -155,13 +160,13 @@ class image_thread(QtCore.QThread):
         self.marker_found, self.marker_coord = self.mean_shift(self.frame_c, self.marker_coord)
 
     def marker_search(self):
-        e1 = cv2.getTickCount()        
-        ret, self.frame_c = self.cap.read()
-        
-        if self.marker_found:
-             self.track_marker()
-        else:
-             self.find_marker()
+        e1 = cv2.getTickCount()
+        time.sleep(0.01)       
+        self.frame_c = self.cam.grab_image()
+        #if self.marker_found:
+             #self.track_marker()
+        #else:
+             #self.find_marker()
         
         x1, y1 = r.w / 2, r.h / 2
         x2 = x1 + int(self.marker_size)        
@@ -170,13 +175,13 @@ class image_thread(QtCore.QThread):
         cv2.rectangle(self.frame_c, (x1, y1), (x2, y2), (0,255,0), 1)
         
         e2 = cv2.getTickCount()
-        time = 1000 * (e2 - e1)/ cv2.getTickFrequency()
+        dtime = 1000 * (e2 - e1)/ cv2.getTickFrequency()
         font = cv2.FONT_HERSHEY_SIMPLEX
-        cv2.putText(self.frame_c,str(time),(100,660), font, 0.8,(255,255,255),2,cv2.LINE_AA)
+        cv2.putText(self.frame_c,str(dtime),(100,660), font, 0.8,(255,255,255),2,cv2.LINE_AA)
         
         # Reduce frame in order to show within widget
         red_frame_c = cv2.resize(self.frame_c, (r.w / 2, r.h / 2))
-        red_frame_c = cv2.flip(red_frame_c, 1)# Mirror flip
+        self.red_frame_c = cv2.flip(red_frame_c, 1)# Mirror flip
         
-        self.red_frame_c = cv2.cvtColor(red_frame_c, cv2.COLOR_BGR2RGB)
+        #self.red_frame_c = cv2.cvtColor(red_frame_c, cv2.COLOR_BGR2RGB)
         self.marker_found_prev = self.marker_found
