@@ -1,3 +1,8 @@
+'''
+Module for solving Perspective-n-Point problem (PnP).
+It uses solvePnP function from OpenCV library
+'''
+
 import root as r
 import numpy as np
 import cv2

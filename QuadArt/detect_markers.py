@@ -1,10 +1,32 @@
+'''
+Module for marker searching on image provided by camera.
+It uses OpenCV as a base image processing library and it runs
+as a separate thread. The core method is mean_shift (do not
+confuse with meanShift from OpenCV) which outputs coordinates
+of a marker's center. The function from OpenCV uses confidence
+map based on color histogram while custom function
+operates with binary image. There are two reasons:
+    1. Custom mean shift algorithm uses simplified "confidence map" - 
+probability 1 for pixel with True value and 0 for False and therefore
+histogram calculation and caclulation of confidence map do not needed.
+    2. Binary image is a result of finding geometrical shape with
+known characteristics. Algorithm searches square shape and convert it
+to contour and this contour used as binary image described above.
+
+find_corners calculates coordinates of marker's corners'
+using cornerHarris from OpenCV. Tracking algorithm works in two
+regimes: 1) full size input image when marker not found and
+2) cropped input image based on coordinates of previous successfully
+found marker.
+    
+'''
+
 import root as r
 import pypylon
 from scipy import signal
 from scipy import misc
 from pyqtgraph.Qt import QtCore
 import numpy as np
-import math
 import cv2
 import time
 

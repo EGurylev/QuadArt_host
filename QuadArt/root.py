@@ -1,3 +1,7 @@
+'''
+Module which contains all global parameters and used as exchange point.
+'''
+
 # Variables and constants shared across all modules
 import numpy as np
 import math

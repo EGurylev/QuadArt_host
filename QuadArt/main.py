@@ -1,3 +1,11 @@
+'''
+The entry point of a program. It uses Qt and PyQtGraph libs as a base for gui.
+There are 3 main threads running:
+1. Thread for gui, feedback control (both simulation and real) and logging
+2. Thread for image processing (marker searching)
+3. Thread for communication with quadrotor (CF)
+'''
+
 import root as r
 import quad_model
 import detect_markers
