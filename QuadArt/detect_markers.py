@@ -38,13 +38,16 @@ class image_thread(QtCore.QThread):
         self.marker_size = self.perimeter_prev / 4
         self.area_prev = self.marker_size * self.marker_size
         self.marker_coord = np.array([r.w / 2, r.h / 2], dtype=np.int32)# Center of a marker
-        self.win_scale = 2 # scale factor for search window
+        self.win_scale = 3 # scale factor for search window
         self.marker_found_prev = False
+        self.debug_frame = []
         # Init Basler camera
         available_cameras = pypylon.factory.find_devices()
         self.cam = pypylon.factory.create_device(available_cameras[0])
         self.cam.open()
         self.cam.camera_init()
+        self.cam.properties['ExposureTime'] = 7000
+        self.cam.properties['GainAuto'] = 'Continuous'
         
         self.marker_found = False
         self.Sig = QtCore.pyqtSignal(np.ndarray, bool, float)
@@ -61,12 +64,18 @@ class image_thread(QtCore.QThread):
         self.marker_search()
         
 
-
     def mean_shift(self, frame, marker_coord):
+        '''
+        Function which tries to find square shape marker on color image and returns
+        status of success and coordinates of the center of found square.
+        '''
+        # Collect all possible candidates for marker as contours
+        # Two parameters of a contour are chosen for decision making: area and perimeter
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         frame_size = gray.shape
-        blur = cv2.blur(gray,(13,13))
-        frame = cv2.adaptiveThreshold(blur,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,27,-3)
+        blur = cv2.blur(gray,(10,10))
+        frame = cv2.adaptiveThreshold(blur,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,27,-2)
+        self.debug_frame = gray
         _, contours, _ = cv2.findContours( frame.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
         area = []
         perimeter = []
@@ -76,13 +85,15 @@ class image_thread(QtCore.QThread):
             
         area = np.array(area)
         perimeter = np.array(perimeter)
-            
+        # The etalon marker's area and perimeter comes from previous found marker
         area_diff = abs(area - self.area_prev) / self.area_prev
         perimeter_diff = abs(perimeter - self.perimeter_prev) / self.perimeter_prev
+        # Such simple mixture gives acceptable result 
         diff = area_diff + perimeter_diff
                     
         if area.size:
             idx = diff.argmin()
+            # Choose candidate with minimal relative error
             min_diff = diff[idx]
             font = cv2.FONT_HERSHEY_SIMPLEX
             cv2.putText(self.frame_c,str(min_diff),(100,500), font, 0.8,(255,255,255),2,cv2.LINE_AA)
@@ -98,6 +109,7 @@ class image_thread(QtCore.QThread):
             c = contours[idx]
             self.area_prev = area[idx]
             self.perimeter_prev = perimeter[idx]
+            # Convert chosen contour points into x and y coordinates
             n = c.shape[0]
             c = c.squeeze()
             c = c.reshape(n * 2, 1)
@@ -147,7 +159,6 @@ class image_thread(QtCore.QThread):
         return marker_found    
         
 
-
     def track_marker(self):
         self.marker_size = self.perimeter_prev / 4
         x1 = self.marker_coord[0] - int(self.win_scale * self.marker_size / 2)
@@ -183,12 +194,12 @@ class image_thread(QtCore.QThread):
 
     def marker_search(self):
         e1 = cv2.getTickCount()
-        time.sleep(0.01)       
+        time.sleep(0.002)      
         self.frame_c = self.cam.grab_image()
-        #if self.marker_found:
-             #self.track_marker()
-        #else:
-             #self.find_marker()
+        if self.marker_found:
+             self.track_marker()
+        else:
+             self.find_marker()
         
         x1, y1 = r.w / 2, r.h / 2
         x2 = x1 + int(self.marker_size)        
