@@ -35,7 +35,8 @@ class main_ui(QtGui.QWidget):
         self.plot_w = pg.PlotWidget()# widget for 2D plots
         self.im_w = RawImageWidget()# image widget
         # Set size policy for custom widgets
-        self.plot_w.sizeHint = self.im_w.sizeHint = lambda: pg.QtCore.QSize(400, 200)
+        self.plot_w.sizeHint = lambda: pg.QtCore.QSize(620, 200)
+        self.im_w.sizeHint = lambda: pg.QtCore.QSize(620, 500)
         self.view_3d_w.sizeHint = lambda: pg.QtCore.QSize(400, 400)
         self.view_3d_w.setSizePolicy(self.plot_w.sizePolicy())
         self.im_w.setSizePolicy(self.plot_w.sizePolicy())
