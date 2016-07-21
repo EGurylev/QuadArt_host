@@ -43,8 +43,9 @@ def print_statistics(log):
         elif reason == 3:
             reason3 += 1.0
         if reason != 0:
-            reason_all += 1.0    
-        
-    print "Fraction of fails due to bad shape is " + str(100 * reason1 / reason_all) + " %"
-    print "Fraction of fails due to unable find corners is " + str(100 * reason2 / reason_all) + " %"
-    print "Fraction of fails due to absence of any shapes in frame is " + str(100 * reason3 / reason_all) + " %"
+            reason_all += 1.0
+             
+    if int(reason_all):    
+        print "Fraction of fails due to bad shape is " + str(100 * reason1 / reason_all) + " %"
+        print "Fraction of fails due to unable find corners is " + str(100 * reason2 / reason_all) + " %"
+        print "Fraction of fails due to absence of any shapes in frame is " + str(100 * reason3 / reason_all) + " %"
