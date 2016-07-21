@@ -40,7 +40,6 @@ class image_thread(QtCore.QThread):
         self.marker_coord = np.array([r.w / 2, r.h / 2], dtype=np.int32)# Center of a marker
         self.win_scale = 3 # scale factor for search window
         self.marker_found_prev = False
-        self.debug_frame = []
         # Init Basler camera
         available_cameras = pypylon.factory.find_devices()
         self.cam = pypylon.factory.create_device(available_cameras[0])
@@ -75,7 +74,6 @@ class image_thread(QtCore.QThread):
         frame_size = gray.shape
         blur = cv2.blur(gray,(10,10))
         frame = cv2.adaptiveThreshold(blur,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,27,-2)
-        self.debug_frame = gray
         _, contours, _ = cv2.findContours( frame.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
         area = []
         perimeter = []
@@ -102,6 +100,7 @@ class image_thread(QtCore.QThread):
             if min_diff > 0.2:
                 marker_found = False
                 cv2.putText(self.frame_c,str(marker_found),(100,620), font, 0.8,(255,255,255),2,cv2.LINE_AA)
+                self.catch_marker_fail(marker_found, 1, gray)
                 return (marker_found, np.array([0, 0]))
             else:
                 marker_found = True
@@ -117,11 +116,20 @@ class image_thread(QtCore.QThread):
             x = np.array(c[0::2])           
             marker_coord = np.array([int(x.mean()), int(y.mean())])
             marker_found = self.find_corners(x, y, frame_size)
+            self.catch_marker_fail(marker_found, 2, gray)
         else:
+            self.catch_marker_fail(marker_found, 3, gray)
             return (False, np.array([0, 0]))
-                    
+            
         return (marker_found, marker_coord)
-        
+    
+    def catch_marker_fail(self, marker_found, reason, frame):
+          if self.marker_found_prev and not marker_found:
+              self.debug_frame = frame
+              r.debug_info[0] = 1
+              r.debug_info[1] = reason
+              r.debug_info[2] = self.area_prev
+              r.debug_info[3] = self.perimeter_prev
       
     def find_corners(self, x, y, frame_size):
         corner_coord_temp = np.zeros((4, 2))

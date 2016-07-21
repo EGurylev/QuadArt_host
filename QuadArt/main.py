@@ -97,7 +97,11 @@ class main_ui(QtGui.QWidget):
                     'y': collections.deque(),
                     'z': collections.deque(),
                     'marker_found': collections.deque(),
-                    'vbat': collections.deque()}
+                    'vbat': collections.deque(),
+                    'marker_fail': collections.deque(),
+                    'marker_fail_reason': collections.deque(),
+                    'marker_area_prev': collections.deque(),
+                    'marker_perimeter_prev': collections.deque()}
         
         self.plot_item = self.plot_w.plot(self.plot_buffer_x, self.plot_buffer_y)
         self.timer = QtCore.QTimer()
@@ -166,6 +170,10 @@ class main_ui(QtGui.QWidget):
         self.log['yaw_set'].append(r.yaw_set)
         self.log['marker_found'].append(r.marker_found)
         self.log['vbat'].append(r.vbat)
+        self.log['marker_fail'].append(r.debug_info[0])
+        self.log['marker_fail_reason'].append(r.debug_info[1])
+        self.log['marker_area_prev'].append(r.debug_info[2])
+        self.log['marker_perimeter_prev'].append(r.debug_info[3])
         if abs(r.tvec[0][0]) < 150:# todo: reconsider this condition
             self.log['x'].append(r.tvec[0][0])
             self.log['y'].append(r.tvec[2][0])
@@ -174,6 +182,9 @@ class main_ui(QtGui.QWidget):
             self.log['x'].append(150)
             self.log['y'].append(150)
             self.log['z'].append(150)
+            
+        r.debug_info[0:4] = [0,0,0,0]# reset trigger debug variables
+            
         
     def closeEvent(self, event):
         self.deleteLater()
@@ -184,6 +195,7 @@ class main_ui(QtGui.QWidget):
         self.improc.cam.camera_stop()
         self.improc.terminate()
         post.write_log(self.log)
+        post.print_statistics(self.log)
         
 
 # Start up the main user-interface

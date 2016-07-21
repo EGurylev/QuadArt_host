@@ -88,6 +88,7 @@ tvec_prev = np.zeros([3,1])
 tvec_prev[2] = 5.0
 rvec = np.zeros([3,1])
 marker_found = False
+debug_info = [0,0,0,0]
 ramp = 1000
 
 # Global function
