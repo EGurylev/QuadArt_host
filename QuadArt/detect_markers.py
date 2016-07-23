@@ -40,6 +40,8 @@ class image_thread(QtCore.QThread):
         self.marker_coord = np.array([r.w / 2, r.h / 2], dtype=np.int32)# Center of a marker
         self.win_scale = 3 # scale factor for search window
         self.marker_found_prev = False
+        self.debug_frame1 = []
+        self.debug_frame2 = []
         # Init Basler camera
         available_cameras = pypylon.factory.find_devices()
         self.cam = pypylon.factory.create_device(available_cameras[0])
@@ -125,14 +127,16 @@ class image_thread(QtCore.QThread):
     
     def catch_marker_fail(self, marker_found, reason, frame):
           if self.marker_found_prev and not marker_found:
-              self.debug_frame = frame
+              if reason == 1:
+                  self.debug_frame1 = frame
+              elif reason == 2:
+                  self.debug_frame2 = frame
               r.debug_info[0] = 1
               r.debug_info[1] = reason
               r.debug_info[2] = self.area_prev
               r.debug_info[3] = self.perimeter_prev
       
     def find_corners(self, x, y, frame_size):
-        corner_coord_temp = np.zeros((4, 2))
         cont_im = np.zeros(frame_size, np.float32)
         cont_im[y,x] = 1
         dst = cv2.cornerHarris(cont_im,15,15,0.1)
@@ -141,30 +145,42 @@ class image_thread(QtCore.QThread):
         _, contours_corn, _ = cv2.findContours( dst.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
         font = cv2.FONT_HERSHEY_SIMPLEX
         #cv2.putText(self.frame_c,str(len(contours_corn)),(100,660), font, 0.8,(255,255,255),2,cv2.LINE_AA)
-        if len(contours_corn) != 4:
+        if len(contours_corn) < 4:
             marker_found = False
             return marker_found
         else:
             marker_found = True
-        i = 0
-        for cont in contours_corn:
-            n = cont.shape[0]
-            c = cont.squeeze()
-            c = c.reshape(n * 2, 1)
-            y = np.array(c[1::2])
-            x = np.array(c[0::2])           
-            corner_coord_temp[i][:] = np.array([int(x.mean()), int(y.mean())])
+            corners = []
+            for cont in contours_corn:
+                n = cont.shape[0]
+                c = cont.squeeze()
+                c = c.reshape(n * 2, 1)
+                y = np.array(c[1::2])
+                x = np.array(c[0::2])
+                #list with areas and coordinates for each corner
+                corners.append([cv2.contourArea(cont), [int(x.mean()), int(y.mean())]])
+            
+            if len(contours_corn) > 4:
+                #sort by contour area and remove N - 4 contours with smallest area
+                corners.sort()
+                for i in xrange(len(corners) - 4):
+                    corners.remove(corners[0])
+                
+            #extract coordinates from combined list
+            corner_coord_temp = map(lambda x: x[:][1], corners)
+            
             # Reorder corner points for pose estimation algorithm
-            if corner_coord_temp[i][0] < frame_size[0] / 2 and corner_coord_temp[i][1] < frame_size[0] / 2:
-                r.corner_coord[0][:] = corner_coord_temp[i][:]
-            elif corner_coord_temp[i][0] > frame_size[0] / 2 and corner_coord_temp[i][1] < frame_size[0] / 2:
-                r.corner_coord[1][:] = corner_coord_temp[i][:]
-            elif corner_coord_temp[i][0] < frame_size[0] / 2 and corner_coord_temp[i][1] > frame_size[0] / 2:
-                r.corner_coord[2][:] = corner_coord_temp[i][:]
-            elif corner_coord_temp[i][0] > frame_size[0] / 2 and corner_coord_temp[i][1] > frame_size[0] / 2:
-                r.corner_coord[3][:] = corner_coord_temp[i][:]
-            i += 1
-        return marker_found    
+            for i in xrange(4):
+                if corner_coord_temp[i][0] < frame_size[0] / 2 and corner_coord_temp[i][1] < frame_size[0] / 2:
+                    r.corner_coord[0][:] = corner_coord_temp[i][:]#top left
+                if corner_coord_temp[i][0] > frame_size[0] / 2 and corner_coord_temp[i][1] < frame_size[0] / 2:
+                    r.corner_coord[1][:] = corner_coord_temp[i][:]#top right
+                if corner_coord_temp[i][0] < frame_size[0] / 2 and corner_coord_temp[i][1] > frame_size[0] / 2:
+                    r.corner_coord[2][:] = corner_coord_temp[i][:]#bottom left
+                if corner_coord_temp[i][0] > frame_size[0] / 2 and corner_coord_temp[i][1] > frame_size[0] / 2:
+                    r.corner_coord[3][:] = corner_coord_temp[i][:]#bottom right
+                    
+        return marker_found
         
 
     def track_marker(self):
