@@ -47,7 +47,7 @@ class image_thread(QtCore.QThread):
         self.cam = pypylon.factory.create_device(available_cameras[0])
         self.cam.open()
         self.cam.camera_init()
-        self.cam.properties['ExposureTime'] = 7000
+        self.cam.properties['ExposureTime'] = 6000
         self.cam.properties['GainAuto'] = 'Continuous'
         
         self.marker_found = False
@@ -179,7 +179,7 @@ class image_thread(QtCore.QThread):
                     r.corner_coord[2][:] = corner_coord_temp[i][:]#bottom left
                 if corner_coord_temp[i][0] > frame_size[0] / 2 and corner_coord_temp[i][1] > frame_size[0] / 2:
                     r.corner_coord[3][:] = corner_coord_temp[i][:]#bottom right
-                    
+    
         return marker_found
         
 
@@ -217,8 +217,7 @@ class image_thread(QtCore.QThread):
         self.marker_found, self.marker_coord = self.mean_shift(self.frame_c, self.marker_coord)
 
     def marker_search(self):
-        e1 = cv2.getTickCount()
-        time.sleep(0.002)      
+        e1 = cv2.getTickCount()     
         self.frame_c = self.cam.grab_image()
         if self.marker_found:
              self.track_marker()
@@ -233,6 +232,7 @@ class image_thread(QtCore.QThread):
         
         e2 = cv2.getTickCount()
         dtime = 1000 * (e2 - e1)/ cv2.getTickFrequency()
+        r.debug_info[4] = dtime
         font = cv2.FONT_HERSHEY_SIMPLEX
         cv2.putText(self.frame_c,str(dtime),(100,660), font, 0.8,(255,255,255),2,cv2.LINE_AA)
         

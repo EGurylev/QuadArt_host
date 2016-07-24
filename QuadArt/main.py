@@ -101,7 +101,8 @@ class main_ui(QtGui.QWidget):
                     'marker_fail': collections.deque(),
                     'marker_fail_reason': collections.deque(),
                     'marker_area_prev': collections.deque(),
-                    'marker_perimeter_prev': collections.deque()}
+                    'marker_perimeter_prev': collections.deque(),
+                    'dt_debug': collections.deque()}
         
         self.plot_item = self.plot_w.plot(self.plot_buffer_x, self.plot_buffer_y)
         self.timer = QtCore.QTimer()
@@ -174,6 +175,7 @@ class main_ui(QtGui.QWidget):
         self.log['marker_fail_reason'].append(r.debug_info[1])
         self.log['marker_area_prev'].append(r.debug_info[2])
         self.log['marker_perimeter_prev'].append(r.debug_info[3])
+        self.log['dt_debug'].append(r.debug_info[4])
         if abs(r.tvec[0][0]) < 150:# todo: reconsider this condition
             self.log['x'].append(r.tvec[0][0])
             self.log['y'].append(r.tvec[2][0])
