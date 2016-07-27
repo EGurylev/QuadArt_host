@@ -10,16 +10,19 @@ from geometry import *
 #Image resolution
 w, h = 1280, 1024
 
-#Camera parameters
-f = 1180.0
+# Marker coordinates
 object_points = np.array([[-l2/2, -l2/2, 0],\
     [l2/2, -l2/2, 0],\
     [-l2/2, l2/2, 0], \
     [l2/2, l2/2, 0]])
-camera_matrix = np.array([[f, 0, w / 2],\
-    [0, f, h / 2], [0, 0, 1]])
-dist_coeffs = np.zeros((5,1))
-    
+
+#Camera parameters for Basler camera with Kowa LM5NCL lens
+camera_matrix = np.array([[837.62249756, 0, 581.72735113],\
+    [0, 834.21710205, 536.5862742],\
+    [0, 0, 1]])
+dist_coeffs = np.array([-5.03037690e-01, 4.90417149e-01, \
+    1.09398451e-02, -3.89431007e-05, -2.62931231e-01])
+roi = (72, 125, 1086, 825)
 
 # Crazyflie config
 link_uri = 'radio://0/80/250K'
